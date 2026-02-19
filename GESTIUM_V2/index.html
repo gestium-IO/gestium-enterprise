@@ -729,18 +729,8 @@ hr.sep{border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0}
       <div class="sb-brand">Gestium IO</div>
       <div class="sb-company" id="sidebarEmpresaNombre">—</div>
     </div>
-    <nav class="sb-nav">
-      <div class="sb-section">Principal</div>
-      <button class="sb-item" data-modulo="dashboard">
-        <span class="sb-dot"></span>Dashboard
-      </button>
-      <button class="sb-item" data-modulo="cotizaciones">
-        <span class="sb-dot"></span>Cotizaciones
-      </button>
-      <div class="sb-section">Gestión</div>
-      <button class="sb-item" data-modulo="financiero">
-        <span class="sb-dot"></span>Finanzas
-      </button>
+    <nav class="sb-nav" id="sbNav">
+      <!-- Construido dinámicamente según plan por construirSidebar() -->
     </nav>
     <div class="sb-footer">
       <!-- Contacto Sidebar -->
@@ -1056,6 +1046,76 @@ document.getElementById('chipModal').addEventListener('click', (e) => {
 });
 </script>
 
+    <!-- ── MÓDULO CONTABILIDAD ── -->
+    <div id="moduloContabilidad" class="page" style="display:none">
+      <div class="sec-title">Contabilidad <span class="sec-title-tag">SUPER PREMIUM</span></div>
+      <div style="padding:40px 0;text-align:center;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:16px">📚</div>
+        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Módulo Contabilidad</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
+          Libro diario, estados financieros y cierre contable.<br>
+          Disponible en el panel completo (<strong>app.html</strong>).
+        </p>
+      </div>
+    </div>
+
+    <!-- ── MÓDULO USUARIOS ── -->
+    <div id="moduloUsuarios" class="page" style="display:none">
+      <div class="sec-title">Usuarios</div>
+      <div style="padding:40px 0;text-align:center;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:16px">👥</div>
+        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Gestión de Usuarios</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
+          Administra los miembros de tu empresa, sus roles y permisos.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── MÓDULO INVITACIONES ── -->
+    <div id="moduloInvitaciones" class="page" style="display:none">
+      <div class="sec-title">Invitaciones</div>
+      <div style="padding:40px 0;text-align:center;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:16px">🔗</div>
+        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Invitar Usuarios</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
+          Genera links de invitación con tiempo de expiración para que nuevos usuarios se unan a tu empresa.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── MÓDULO LOGS ── -->
+    <div id="moduloLogs" class="page" style="display:none">
+      <div class="sec-title">Auditoría</div>
+      <div style="padding:40px 0;text-align:center;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:16px">📝</div>
+        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Registro de Auditoría</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
+          Todas las acciones del sistema quedan registradas: quién, qué y cuándo.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── MÓDULO OCR ── -->
+    <div id="moduloOCR" class="page" style="display:none">
+      <div class="sec-title">OCR Medidas <span class="sec-title-tag">SUPER PREMIUM</span></div>
+      <div style="padding:40px 0;text-align:center;color:var(--text2)">
+        <div style="font-size:48px;margin-bottom:16px">🔍</div>
+        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">OCR con Google Vision</h3>
+        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
+          Fotografía una orden de pedido y el sistema extrae las medidas automáticamente para cotizar.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── MÓDULO SUPERADMIN ── -->
+    <div id="moduloSuperadmin" class="page" style="display:none">
+      <div class="sec-title">⚙ Superadmin</div>
+      <div id="superadminContent" style="padding:20px 0">
+        <p style="color:var(--text3);font-size:13px">Cargando panel de control...</p>
+      </div>
+    </div>
+
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import {
@@ -1214,31 +1274,93 @@ window.addEventListener('DOMContentLoaded', () => {
     catch(err){ $("loginMessage").textContent=err.message; }
   });
 
-  /* ── AUTH STATE ── */
+  /* ── AUTH STATE — ARQUITECTURA MULTIEMPRESA ── */
   onAuthStateChanged(auth, async(user)=>{
     try {
       if(!user){ loginScreen.style.display="flex"; appDiv.style.display="none"; setLL(false); return; }
-      const uSnap=await getDoc(doc(db,"Usuarios",user.uid));
-      if(!uSnap.exists()){ alert("Usuario no configurado."); await signOut(auth); return; }
-      usuarioData=uSnap.data();
-      if(!usuarioData.activo){ alert("Usuario desactivado."); await signOut(auth); return; }
-      if(!usuarioData.empresaId){ alert("Sin empresa asignada."); await signOut(auth); return; }
-      empresaId=usuarioData.empresaId;
-      const eSnap=await getDoc(doc(db,"empresas",empresaId));
+
+      // 1. Leer empresaId desde usuariosMeta (índice ligero)
+      let eId = localStorage.getItem("gestium_emp_"+user.uid);
+      let uData = null;
+
+      if(eId){
+        const uSnap = await getDoc(doc(db,"empresas",eId,"usuarios",user.uid));
+        if(uSnap.exists()) uData = uSnap.data();
+      }
+
+      if(!uData){
+        const metaSnap = await getDoc(doc(db,"usuariosMeta",user.uid));
+        if(metaSnap.exists()){
+          eId = metaSnap.data().empresaId;
+          localStorage.setItem("gestium_emp_"+user.uid, eId);
+          const uSnap2 = await getDoc(doc(db,"empresas",eId,"usuarios",user.uid));
+          if(uSnap2.exists()) uData = uSnap2.data();
+        }
+      }
+
+      // Fallback: colección global Usuarios (legado)
+      if(!uData){
+        const uSnapLeg = await getDoc(doc(db,"Usuarios",user.uid));
+        if(uSnapLeg.exists()){
+          uData = uSnapLeg.data();
+          eId = uData.empresaId || eId;
+        }
+      }
+
+      if(!uData || !eId){ alert("Usuario no configurado. Contacta al soporte."); await signOut(auth); return; }
+      if(!uData.activo){ alert("Usuario desactivado."); await signOut(auth); return; }
+
+      usuarioData = uData;
+      empresaId   = eId;
+      localStorage.setItem("gestium_emp_"+user.uid, empresaId);
+
+      const eSnap = await getDoc(doc(db,"empresas",empresaId));
       if(!eSnap.exists()){ alert("Empresa no encontrada."); await signOut(auth); return; }
-      empresaData=eSnap.data()||{};
-      if(empresaData.vencimiento&&new Date()>empresaData.vencimiento.toDate()){ alert("Plan vencido. Contacta soporte."); await signOut(auth); return; }
-      const nomEmp=empresaData.nombre||"Mi Empresa";
-      $("sidebarEmpresaNombre").textContent=nomEmp; $("topbarTitle").textContent=nomEmp;
-      const nombre=[usuarioData.nombre,usuarioData.apellido].filter(Boolean).join(" ")||"Usuario";
-      $("sidebarUserName").textContent=nombre; $("sidebarUserEmail").textContent=user.email||"";
-      $("userAvatar").textContent=(usuarioData.nombre||"?")[0].toUpperCase();
-      logoB64=empresaData.logo||null;
+      empresaData = eSnap.data()||{};
+
+      // Vencimiento — no aplica a superadmin
+      if(!usuarioData.superadmin){
+        const venc = empresaData.fechaVencimiento || empresaData.vencimiento;
+        if(venc && new Date() > venc.toDate()){ alert("Plan vencido. Contacta a soporte."); await signOut(auth); return; }
+      }
+
+      // Detectar plan efectivo
+      const planEfectivo = usuarioData.superadmin ? "superadmin" : (empresaData.plan || "trial");
+
+      // Actualizar UI
+      const nomEmp = empresaData.nombre||"Mi Empresa";
+      $("sidebarEmpresaNombre").textContent = nomEmp;
+      $("topbarTitle").textContent = nomEmp;
+      const nombre = [usuarioData.nombre,usuarioData.apellido].filter(Boolean).join(" ")||"Usuario";
+      $("sidebarUserName").textContent  = nombre;
+      $("sidebarUserEmail").textContent = user.email||"";
+      $("userAvatar").textContent = (usuarioData.nombre||"?")[0].toUpperCase();
+
+      // Badge de plan en topbar
+      const badge = document.querySelector(".topbar-badge");
+      if(badge){
+        const nombres = {trial:"Trial",basico:"Básico",premium:"Premium",superpremium:"SuperPremium",superadmin:"⚙ Superadmin"};
+        badge.textContent = nombres[planEfectivo] || planEfectivo;
+        badge.style.background = planEfectivo==="superadmin" ? "rgba(249,115,22,.2)" : "";
+        badge.style.color      = planEfectivo==="superadmin" ? "#f97316" : "";
+      }
+
+      logoB64 = empresaData.logoUrl || empresaData.logo || null;
       if(logoB64){ $("logoPreview").src=logoB64; $("logoPreview").style.display="block"; }
+
+      // ── CONSTRUIR SIDEBAR DINÁMICO SEGÚN PLAN ──
+      construirSidebar(planEfectivo, usuarioData.superadmin);
+
       await cargarClientes();
       loginScreen.style.display="none"; appDiv.style.display="block";
       mostrarModulo("cotizaciones"); setLL(false);
-    } catch(err){ setLL(false); alert("Error: "+(err.message||err)); try{await signOut(auth);}catch(e){} }
+
+    } catch(err){
+      setLL(false);
+      console.error("[auth]", err);
+      alert("Error al iniciar sesión: "+(err.message||err));
+      try{await signOut(auth);}catch(e){}
+    }
   });
 
   $("sidebarLogout").addEventListener("click", async()=>{
@@ -1253,19 +1375,91 @@ window.addEventListener('DOMContentLoaded', () => {
   overlay.addEventListener("click",()=>{ sidebar.classList.remove("open"); overlay.classList.remove("on"); });
 
   /* ── NAVEGACIÓN ── */
+  // Definición de todos los módulos disponibles
+  const TODOS_MODULOS = ["moduloCotizaciones","moduloDashboard","moduloFinanciero",
+    "moduloContabilidad","moduloUsuarios","moduloLogs","moduloInvitaciones",
+    "moduloOCR","moduloSuperadmin"];
+
   window.mostrarModulo = function(n){
-    ["moduloCotizaciones","moduloDashboard","moduloFinanciero"].forEach(id=>$(id).style.display="none");
-    if(n==="cotizaciones") $("moduloCotizaciones").style.display="block";
-    if(n==="dashboard")    { $("moduloDashboard").style.display="block"; actualizarDashboard(); }
-    if(n==="financiero")   { $("moduloFinanciero").style.display="block"; cargarCostos(); actualizarKPIs(); cargarCotizacionesMes(); }
+    TODOS_MODULOS.forEach(id=>{ const el=$(id); if(el) el.style.display="none"; });
+    const mapa = {
+      cotizaciones: ()=>{ $("moduloCotizaciones").style.display="block"; },
+      dashboard:    ()=>{ $("moduloDashboard").style.display="block"; actualizarDashboard(); },
+      financiero:   ()=>{ $("moduloFinanciero").style.display="block"; cargarCostos(); actualizarKPIs(); cargarCotizacionesMes(); },
+      contabilidad: ()=>{ const m=$("moduloContabilidad"); if(m) m.style.display="block"; },
+      usuarios:     ()=>{ const m=$("moduloUsuarios"); if(m) m.style.display="block"; cargarUsuarios(); },
+      logs:         ()=>{ const m=$("moduloLogs"); if(m) m.style.display="block"; cargarLogs(); },
+      invitaciones: ()=>{ const m=$("moduloInvitaciones"); if(m) m.style.display="block"; cargarInvitaciones(); },
+      ocr:          ()=>{ const m=$("moduloOCR"); if(m) m.style.display="block"; },
+      superadmin:   ()=>{ const m=$("moduloSuperadmin"); if(m) m.style.display="block"; cargarSuperadmin(); },
+    };
+    if(mapa[n]) mapa[n]();
+    document.querySelectorAll(".sb-item").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(`.sb-item[data-modulo="${n}"]`).forEach(x=>x.classList.add("active"));
+    if(sidebar) sidebar.classList.remove("open");
+    if(overlay) overlay.classList.remove("on");
   };
-  document.querySelectorAll(".sb-item[data-modulo]").forEach(b=>{
-    b.addEventListener("click",()=>{
-      document.querySelectorAll(".sb-item").forEach(x=>x.classList.remove("active"));
-      b.classList.add("active"); mostrarModulo(b.dataset.modulo);
-      sidebar.classList.remove("open"); overlay.classList.remove("on");
+
+  // Stubs para módulos aún no implementados en index.html
+  function cargarUsuarios(){ const m=$("moduloUsuarios"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">👥</div><h3>Gestión de Usuarios</h3><p style="color:var(--text3);margin-top:8px">Módulo disponible en el panel completo.</p></div>'; }
+  function cargarLogs(){ const m=$("moduloLogs"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">📝</div><h3>Auditoría</h3><p style="color:var(--text3);margin-top:8px">Registro de todas las acciones del sistema.</p></div>'; }
+  function cargarInvitaciones(){ const m=$("moduloInvitaciones"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">🔗</div><h3>Invitaciones</h3><p style="color:var(--text3);margin-top:8px">Invita usuarios a tu empresa por link.</p></div>'; }
+  function cargarSuperadmin(){ const m=$("moduloSuperadmin"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">⚙️</div><h3>Superadmin</h3><p style="color:var(--text3);margin-top:8px">Panel de control del sistema GESTIUM.</p></div>'; }
+
+  // Construir sidebar dinámicamente según plan
+  window.construirSidebar = function(plan, esSuperAdmin){
+    const FEATURES = {
+      trial:        ["cotizaciones","dashboard"],
+      basico:       ["cotizaciones","dashboard"],
+      premium:      ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones"],
+      superpremium: ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones","contabilidad","ocr"],
+      superadmin:   ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones","contabilidad","ocr","superadmin"],
+    };
+    const items = [
+      { key:"cotizaciones", icon:"📋", label:"Cotizaciones",  section:"PRINCIPAL" },
+      { key:"dashboard",    icon:"📊", label:"Dashboard",     section:null },
+      { key:"financiero",   icon:"💰", label:"Finanzas",      section:"GESTIÓN" },
+      { key:"contabilidad", icon:"📚", label:"Contabilidad",  section:null },
+      { key:"usuarios",     icon:"👥", label:"Usuarios",      section:"EQUIPO" },
+      { key:"invitaciones", icon:"🔗", label:"Invitaciones",  section:null },
+      { key:"logs",         icon:"📝", label:"Auditoría",     section:"SISTEMA" },
+      { key:"ocr",          icon:"🔍", label:"OCR Medidas",   section:null },
+      { key:"superadmin",   icon:"⚙️",  label:"Superadmin",   section:null },
+    ];
+    const features = FEATURES[plan] || FEATURES.trial;
+    const nav = $("sbNav");
+    if(!nav) return;
+    nav.innerHTML = "";
+    let lastSection = "";
+    items.forEach(item=>{
+      if(item.key==="superadmin" && !esSuperAdmin) return;
+      if(item.section && item.section !== lastSection){
+        const sec = document.createElement("div");
+        sec.className = "sb-section";
+        sec.textContent = item.section;
+        nav.appendChild(sec);
+        lastSection = item.section;
+      }
+      const tiene = features.includes(item.key);
+      const btn = document.createElement("button");
+      btn.className = "sb-item" + (tiene ? "" : " locked");
+      btn.dataset.modulo = item.key;
+      btn.innerHTML = `<span style="font-size:15px;flex-shrink:0">${item.icon}</span><span style="flex:1">${item.label}</span>${tiene ? '<span class="sb-dot"></span>' : '<span style="font-size:9px;color:#f59e0b;font-weight:700">🔒</span>'}`;
+      btn.addEventListener("click", ()=>{
+        if(!tiene){ _toast('"'+item.label+'" requiere plan superior',"warn"); return; }
+        mostrarModulo(item.key);
+      });
+      nav.appendChild(btn);
     });
-  });
+  };
+
+  function _toast(msg, tipo="info"){
+    let el=document.getElementById("toastG");
+    if(!el){ el=document.createElement("div"); el.id="toastG"; el.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;transition:opacity .25s;"; document.body.appendChild(el); }
+    const c={success:["#06d6c8","#070d1a"],error:["#ef4444","#fff"],warn:["#f59e0b","#070d1a"],info:["#3b82f6","#fff"]}[tipo]||["#3b82f6","#fff"];
+    el.style.background=c[0]; el.style.color=c[1]; el.textContent=msg; el.style.opacity="1";
+    clearTimeout(el._t); el._t=setTimeout(()=>{ el.style.opacity="0"; },3000);
+  }
 
   /* ── CLIENTES ── */
   async function cargarClientes(){
