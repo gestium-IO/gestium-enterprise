@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GESTIUM · Inteligencia Operativa para tu Empresa</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#070d1a;--navy2:#0d1629;--navy3:#111e35;--navy4:#1a2a45;--orange:#f97316;--teal:#06d6c8;--teal3:#67e8f9;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--white:#ffffff;--green:#10b981;--amber:#f59e0b;--purple:#8b5cf6;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Syne',system-ui,sans-serif;background:var(--navy);color:var(--text);-webkit-font-smoothing:antialiased}
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(6,214,200,.14) 0%,transparent 55%),radial-gradient(ellipse at 80% 20%,rgba(249,115,22,.16) 0%,transparent 50%),radial-gradient(ellipse at 60% 80%,rgba(139,92,246,.08) 0%,transparent 45%);pointer-events:none}
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(6,214,200,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(6,214,200,.04) 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+nav{padding:24px 60px;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:10;border-bottom:1px solid rgba(255,255,255,.04)}
+.nav-logo{font-size:20px;font-weight:800;color:var(--white);letter-spacing:2px}
+.nav-logo span{color:var(--orange)}
+.nav-links{display:flex;gap:10px;align-items:center}
+.nav-btn{padding:10px 22px;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;border:none;letter-spacing:.3px}
+.nav-btn.ghost{background:none;color:var(--teal);border:1px solid rgba(6,214,200,.2)}
+.nav-btn.ghost:hover{background:rgba(6,214,200,.08)}
+.nav-btn.cta{background:linear-gradient(135deg,var(--teal),var(--orange));color:#fff;box-shadow:0 4px 20px rgba(249,115,22,.25)}
+.nav-btn.cta:hover{box-shadow:0 6px 30px rgba(249,115,22,.4);transform:translateY(-1px)}
+.hero-content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 40px;position:relative;z-index:1}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--teal);margin-bottom:24px;display:inline-flex;align-items:center;gap:10px}
+.eyebrow::before,.eyebrow::after{content:'';width:28px;height:1px;background:var(--teal)}
+h1{font-size:clamp(40px,6vw,76px);font-weight:800;line-height:1.02;color:var(--white);letter-spacing:-2px;margin-bottom:22px;max-width:860px}
+h1 em{color:var(--orange);font-style:normal;text-shadow:0 0 60px rgba(249,115,22,.4)}
+.hero-desc{font-size:18px;color:var(--text2);line-height:1.7;max-width:540px;margin-bottom:44px}
+.cta-group{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:60px}
+.btn-hero{padding:15px 32px;border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all .2s}
+.btn-hero.primary{background:linear-gradient(135deg,var(--teal),var(--orange));color:#fff;box-shadow:0 6px 30px rgba(249,115,22,.3)}
+.btn-hero.primary:hover{box-shadow:0 8px 40px rgba(249,115,22,.5);transform:translateY(-2px)}
+.btn-hero.secondary{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.1)}
+.btn-hero.secondary:hover{background:rgba(255,255,255,.1)}
+/* FEATURES */
+.section{padding:100px 60px;position:relative}
+.section-title{font-size:clamp(28px,4vw,42px);font-weight:800;color:var(--white);letter-spacing:-1px;margin-bottom:12px;text-align:center}
+.section-sub{font-size:16px;color:var(--text2);text-align:center;margin-bottom:56px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.7}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;max-width:1100px;margin:0 auto}
+.feat-card{background:var(--navy2);border-radius:16px;border:1px solid rgba(255,255,255,.06);padding:28px;transition:all .25s}
+.feat-card:hover{border-color:rgba(6,214,200,.2);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.feat-icon{font-size:36px;margin-bottom:16px}
+.feat-title{font-size:16px;font-weight:800;color:var(--white);margin-bottom:8px}
+.feat-desc{font-size:13px;color:var(--text2);line-height:1.7}
+/* PLANES */
+.bg-orb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(80px);opacity:.08}
+.bg-orb-1{width:700px;height:700px;background:var(--teal);bottom:-250px;left:-200px;animation:orbSpin 25s linear infinite}
+.bg-orb-2{width:600px;height:600px;background:var(--orange);top:-200px;right:-150px;animation:orbSpin 20s linear infinite reverse}
+.bg-orb-3{width:350px;height:350px;background:#8b5cf6;top:50%;left:50%;animation:orbFloat 18s ease-in-out infinite}
+@keyframes orbSpin{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.1)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes orbFloat{0%,100%{transform:translate(-50%,-50%) scale(1)}33%{transform:translate(-60%,-40%) scale(1.15)}66%{transform:translate(-40%,-60%) scale(.9)}}
+.plan-card{background:var(--navy2);border-radius:16px;border:1px solid rgba(255,255,255,.06);padding:32px;transition:all .25s;position:relative}
+.plan-card.featured{border-color:rgba(6,214,200,.3);background:var(--navy3)}
+.plan-card.featured::before{content:'⭐ MÁS POPULAR';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--teal),var(--orange));color:#fff;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:4px 14px;border-radius:100px;white-space:nowrap}
+.plan-name{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+.plan-price{font-size:36px;font-weight:800;color:var(--white);margin-bottom:4px;font-family:'JetBrains Mono',monospace}
+.plan-price span{font-size:14px;color:var(--text2);font-family:'Syne',sans-serif}
+.plan-desc{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
+.plan-features{list-style:none;margin-bottom:28px}
+.plan-features li{font-size:13px;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:10px}
+.plan-features li::before{content:'✓';color:var(--teal);font-weight:700;flex-shrink:0}
+.plan-features li.off{color:var(--text3)}
+.plan-features li.off::before{content:'✗';color:var(--text3)}
+.plan-cta{display:block;width:100%;padding:12px;border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;transition:all .2s;border:none}
+.plan-cta.teal{background:linear-gradient(135deg,var(--teal),var(--orange));color:#fff;box-shadow:0 4px 20px rgba(249,115,22,.2)}
+.plan-cta.teal:hover{box-shadow:0 6px 30px rgba(249,115,22,.4)}
+.plan-cta.ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.1)}
+.plan-cta.ghost:hover{background:rgba(255,255,255,.1)}
+/* FOOTER */
+footer{background:var(--navy2);border-top:1px solid rgba(255,255,255,.05);padding:40px 60px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.footer-logo{font-size:16px;font-weight:800;color:var(--white);letter-spacing:2px}
+.footer-logo span{color:var(--orange)}
+.footer-links{display:flex;gap:24px;flex-wrap:wrap}
+.footer-links a{font-size:13px;color:var(--text2);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:var(--teal)}
+@media(max-width:768px){nav,footer{padding:20px 24px}.section{padding:60px 24px}.hero-content{padding:60px 20px}.nav-links{gap:6px}}
+</style>
+</head>
+<body>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+<div class="hero">
+  <div class="grid-bg"></div>
+  <nav>
+    <div class="nav-logo">GESTIUM <span>·</span></div>
+    <div class="nav-links">
+      <a href="https://wa.me/573005541411" target="_blank" class="nav-btn ghost">📱 Contacto</a>
+      <a href="app.html" class="nav-btn cta">Iniciar sesión →</a>
+    </div>
+  </nav>
+  <div class="hero-content">
+    <div class="eyebrow">Software SaaS · Inteligencia Operativa</div>
+    <h1>El sistema que tu empresa<br><em>necesitaba</em> desde hace años.</h1>
+    <p class="hero-desc">Cotizaciones en PDF, control de ventas, dashboard financiero y auditoría completa. Todo en tiempo real, en la nube, sin instalaciones.</p>
+    <div class="cta-group">
+      <a href="app.html" class="btn-hero primary">🚀 Empezar gratis — 7 días trial</a>
+      <a href="https://wa.me/573005541411?text=Quiero una demo de GESTIUM" target="_blank" class="btn-hero secondary">Ver demo en vivo →</a>
+    </div>
+  </div>
+</div>
+
+<section class="section">
+  <div class="eyebrow" style="display:flex;justify-content:center;margin-bottom:16px">Funcionalidades</div>
+  <h2 class="section-title">Todo lo que necesitas,<br>nada de lo que no.</h2>
+  <p class="section-sub">Diseñado específicamente para empresas de manufactura y servicios en Colombia.</p>
+  <div class="features-grid">
+    <div class="feat-card"><div class="feat-icon">📄</div><div class="feat-title">PDFs profesionales</div><div class="feat-desc">Cotizaciones con logo, datos de empresa, watermark y cálculo automático de m³, subtotales e IVA. Un clic.</div></div>
+    <div class="feat-card"><div class="feat-icon">📊</div><div class="feat-title">Dashboard en tiempo real</div><div class="feat-desc">KPIs de ventas, gráficos por cliente y estado, actualización instantánea vía Firebase onSnapshot.</div></div>
+    <div class="feat-card"><div class="feat-icon">👥</div><div class="feat-title">Multi-usuario y roles</div><div class="feat-desc">Admin, vendedor, contabilidad. Permisos específicos por acción. Sistema de invitaciones por token.</div></div>
+    <div class="feat-card"><div class="feat-icon">💰</div><div class="feat-title">Control financiero</div><div class="feat-desc">Registra costos y gastos por cliente y categoría. Disponible en plan Premium.</div></div>
+    <div class="feat-card"><div class="feat-icon">🗒</div><div class="feat-title">Auditoría completa</div><div class="feat-desc">Cada acción queda registrada con usuario, fecha y detalle. Trazabilidad total de tu operación.</div></div>
+    <div class="feat-card"><div class="feat-icon">🛡</div><div class="feat-title">Panel Superadmin</div><div class="feat-desc">Control total de todas las empresas, planes, vencimientos y métricas SaaS (MRR, churn, activaciones).</div></div>
+  </div>
+</section>
+
+<section class="section" style="background:var(--navy2);border-top:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.04)">
+  <div class="eyebrow" style="display:flex;justify-content:center;margin-bottom:16px">Planes</div>
+  <h2 class="section-title">Simple. Justo. Sin sorpresas.</h2>
+  <p class="section-sub">Todos los planes incluyen 7 días de prueba gratuita.</p>
+  <div class="planes-grid" style="max-width:1100px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+    <div class="plan-card">
+      <div class="plan-name">Trial</div>
+      <div class="plan-price">Gratis <span>/ 7 días</span></div>
+      <div class="plan-desc">Para que conozcas el sistema sin compromiso.</div>
+      <ul class="plan-features">
+        <li>Cotizaciones (hasta 10/día)</li><li>Dashboard básico</li>
+        <li class="off">Módulo financiero</li><li class="off">Contabilidad</li><li class="off">OCR</li>
+      </ul>
+      <a href="app.html" class="plan-cta ghost">Empezar gratis</a>
+    </div>
+    <div class="plan-card">
+      <div class="plan-name">Básico</div>
+      <div class="plan-price">$29.000 <span>/ mes</span></div>
+      <div class="plan-desc">Para equipos pequeños que necesitan lo esencial.</div>
+      <ul class="plan-features">
+        <li>Cotizaciones (hasta 25/día)</li><li>Dashboard completo</li>
+        <li class="off">Módulo financiero</li><li class="off">Contabilidad</li><li>Multi-usuario básico</li>
+      </ul>
+      <a href="https://wa.me/573005541411?text=Quiero el plan Básico de GESTIUM" target="_blank" class="plan-cta ghost">Contratar</a>
+    </div>
+    <div class="plan-card featured">
+      <div class="plan-name">Premium</div>
+      <div class="plan-price">$89.000 <span>/ mes</span></div>
+      <div class="plan-desc">Para empresas que necesitan control total de ventas.</div>
+      <ul class="plan-features">
+        <li>Cotizaciones (hasta 50/día)</li><li>Dashboard en tiempo real</li>
+        <li>Módulo financiero</li><li>Logs de auditoría</li>
+        <li>Invitaciones y roles</li><li class="off">Contabilidad completa</li><li class="off">OCR de medidas</li>
+      </ul>
+      <a href="https://wa.me/573005541411?text=Quiero el plan Premium de GESTIUM" target="_blank" class="plan-cta teal">Contratar Premium</a>
+    </div>
+    <div class="plan-card" style="border-color:rgba(139,92,246,.3);background:linear-gradient(135deg,var(--navy2),rgba(139,92,246,.05))">
+      <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#8b5cf6,#06d6c8);color:#fff;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:4px 14px;border-radius:100px;white-space:nowrap">✨ MÁXIMA POTENCIA</div>
+      <div class="plan-name" style="color:#a78bfa">Super Premium</div>
+      <div class="plan-price" style="background:linear-gradient(135deg,#8b5cf6,var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent">$189.000 <span style="-webkit-text-fill-color:var(--text2)">/ mes</span></div>
+      <div class="plan-desc">Inteligencia financiera completa. Nivel CFO.</div>
+      <ul class="plan-features">
+        <li>Todo lo de Premium</li>
+        <li>🏛 Contabilidad completa (PUC Colombia)</li>
+        <li>📈 Estado de Resultados automático</li>
+        <li>⚖️ Balance General en tiempo real</li>
+        <li>💧 Flujo de caja predictivo 30/60/90d</li>
+        <li>🔔 Alertas financieras automáticas</li>
+        <li>💎 Rentabilidad por cliente</li>
+        <li>🎯 Score de riesgo por cliente</li>
+        <li>🔮 Simulador de escenarios (CFO)</li>
+        <li>✅ Pre-cierre contable asistido</li>
+        <li>🔍 OCR: leer medidas desde fotos</li>
+        <li>🏛 Impuestos IVA/Retención/ICA auto</li>
+      </ul>
+      <a href="https://wa.me/573005541411?text=Quiero el plan Super Premium de GESTIUM" target="_blank" class="plan-cta teal" style="background:linear-gradient(135deg,#8b5cf6,var(--teal))">Contratar Super Premium</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">GESTIUM <span>·</span> Inteligencia Operativa</div>
+  <div class="footer-links">
+    <a href="app.html">Iniciar sesión</a>
+    <a href="https://wa.me/573005541411" target="_blank">📱 WhatsApp</a>
+    <a href="mailto:gestium.inteligencia@gmail.com">✉️ Email</a>
+    <a href="https://www.facebook.com/GestiumInteligenciaOperativa" target="_blank">📘 Facebook</a>
+    <a href="https://www.instagram.com/GestiumInteligenciaOperativa" target="_blank">📸 Instagram</a>
+    <a href="https://www.linkedin.com/company/GestiumInteligenciaOperativa" target="_blank">💼 LinkedIn</a>
+  </div>
+  <div style="font-size:12px;color:var(--text3)">© 2025 GESTIUM · Hecho en Colombia 🇨🇴</div>
+</footer>
