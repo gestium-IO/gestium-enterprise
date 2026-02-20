@@ -8,7 +8,7 @@
 # ── REDIRECTS ──────────────────────────────────────────────
 [[redirects]]
   from = "/"
-  to   = "/index.html"
+  to   = "/landing.html"
   status = 200
 
 [[redirects]]
