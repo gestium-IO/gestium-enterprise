@@ -1,20 +1,11 @@
 rules_version = '2';
-// ═══════════════════════════════════════════════════════════════════
-//  GESTIUM · Firestore Rules v3.0 — Production Hardened
-//  Cambios vs v2.0:
-//  + getEmpresa() con null-safe (empresaExiste check)
-//  + ocrUsage: validación de incremento exacto count+1 (anti-tamper)
-//  + usuariosMeta: empresaId inmutable en update
-//  + usuarios/create: rol "admin" solo lo puede asignar otro admin
-//  + empresas/create: bloqueado si el usuario YA tiene meta (evita duplicar empresa)
-// ═══════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* ═══════════════════════════════════════════════ */
-    /*  UTILIDADES BASE                               */
-    /* ═══════════════════════════════════════════════ */
+    /* ============================
+       UTILIDADES BASE
+    ============================ */
 
     function isAuth() {
       return request.auth != null;
@@ -44,13 +35,13 @@ service cloud.firestore {
       let emp = getEmpresa(empresaId);
       return emp != null
         && (
-             (('activa' in emp) && emp.activa == true)
-             || (('activo' in emp) && emp.activo == true)
-           )
+          (('activa' in emp) && emp.activa == true)
+          || (('activo' in emp) && emp.activo == true)
+        )
         && (
-             !('fechaVencimiento' in emp)
-             || emp.fechaVencimiento > request.time
-           );
+          !('fechaVencimiento' in emp)
+          || emp.fechaVencimiento > request.time
+        );
     }
 
     function getRol(empresaId) {
@@ -86,17 +77,19 @@ service cloud.firestore {
       return getPlan(empresaId) == "superpremium";
     }
 
-    /* ═══════════════════════════════════════════════ */
-    /*  EMPRESAS                                      */
-    /* ═══════════════════════════════════════════════ */
+    /* ============================
+       EMPRESAS
+    ============================ */
 
     match /empresas/{empresaId} {
 
       allow read:
-        if perteneceAEmpresa(empresaId) || esSuperAdmin();
+        if (
+          isAuth()
+          && exists(/databases/$(database)/documents/empresas/$(empresaId)/usuarios/$(request.auth.uid))
+        )
+        || esSuperAdmin();
 
-      // Solo se puede crear empresa si el usuario NO tiene ya una empresa asignada
-      // Esto evita que alguien cree múltiples empresas con la misma cuenta
       allow create:
         if isAuth()
         && !usuarioMetaExiste()
@@ -105,83 +98,58 @@ service cloud.firestore {
 
       allow update:
         if esSuperAdmin()
-        || (
-            esAdmin(empresaId)
-            && request.resource.data.diff(resource.data)
-              .affectedKeys()
-              .hasOnly(['nombre','telefono','direccion','web','logo'])
-          );
-
+        || esAdmin(empresaId);
 
       allow delete: if false;
 
-      /* ─────────────────────────── */
-      /*  USUARIOS                   */
-      /* ─────────────────────────── */
+      /* ============================
+         USUARIOS
+      ============================ */
 
       match /usuarios/{uid} {
 
         allow read:
-          if perteneceAEmpresa(empresaId) || esSuperAdmin();
+          if (isAuth() && request.auth.uid == uid)
+          || esSuperAdmin();
 
         allow create:
           if (esAdmin(empresaId) || esSuperAdmin())
           && request.resource.data.keys().hasAll(['email','nombre','rol','activo'])
-          && request.resource.data.rol in ['admin','vendedor','contabilidad']
-          && (
-              request.resource.data.rol != "admin"
-              || esAdmin(empresaId)
-              || esSuperAdmin()
-            );
-
+          && request.resource.data.rol in ['admin','vendedor','contabilidad'];
 
         allow update:
-        if (esAdmin(empresaId) || esSuperAdmin())
-        && request.resource.data.diff(resource.data)
-            .affectedKeys()
-            .hasOnly(['nombre','activo','rol'])
-        && (
-            request.resource.data.rol != "admin"
-            || esAdmin(empresaId)
-            || esSuperAdmin()
-          )
-          && (
-                request.auth.uid != uid
-                || request.resource.data.activo == true
-              )
-      ;
+          if esSuperAdmin()
+          || esAdmin(empresaId);
 
+        allow delete: if false;
       }
 
-      /* ─────────────────────────── */
-      /*  CLIENTES                   */
-      /* ─────────────────────────── */
+      /* ============================
+         CLIENTES
+      ============================ */
 
       match /clientes/{clienteId} {
 
         allow read:
           if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-       allow create:
-        if perteneceAEmpresa(empresaId)
-        && empresaActiva(empresaId)
-        && request.resource.data.keys().hasAll(['nombre','nombreNormalizado','creadoEn'])
-        && request.resource.data.nombre is string
-        && request.resource.data.creadoEn is timestamp;
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.keys().hasAll(['nombre','nombreNormalizado','creadoEn'])
+          && request.resource.data.nombre is string
+          && request.resource.data.creadoEn is timestamp;
 
-       allow update:
-        if perteneceAEmpresa(empresaId)
-        && empresaActiva(empresaId)
-        && request.resource.data.diff(resource.data)
-            .affectedKeys()
-            .hasOnly(['nombre','nombreNormalizado','telefono','email','direccion']);
+        allow update:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId);
 
         allow delete: if false;
       }
 
-      /* ─────────────────────────── */
-      /*  COTIZACIONES               */
-      /* ─────────────────────────── */
+      /* ============================
+         COTIZACIONES
+      ============================ */
 
       match /cotizaciones/{cotizacionId} {
 
@@ -191,184 +159,89 @@ service cloud.firestore {
         allow create:
           if perteneceAEmpresa(empresaId)
           && empresaActiva(empresaId)
-          && request.resource.data.keys().hasAll([
-               'numero','cliente','fecha','subtotal',
-               'iva','total','estado','eliminado'
-             ])
           && request.resource.data.total is number
           && request.resource.data.subtotal is number
           && request.resource.data.fecha is timestamp
           && request.resource.data.estado in
-             ['Pendiente','En espera','Convertida','Cancelada']
-          && request.resource.data.eliminado == false;
+             ['Pendiente','En espera','Convertida','Cancelada'];
 
-        // Update: no se puede cambiar el número de la cotización
-        // Si eliminado == true, no se puede actualizar ningún otro campo (soft delete final)
         allow update:
           if perteneceAEmpresa(empresaId)
           && empresaActiva(empresaId)
-          && request.resource.data.numero == resource.data.numero
-          && (
-               // Si ya está eliminada, no se puede modificar nada más
-               resource.data.eliminado != true
-               // Solo se puede marcar como eliminada (soft delete), nunca revertir
-               || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eliminado','eliminadoEn'])
-             );
+          && request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['estado']);
 
         allow delete: if false;
       }
 
-      /* ─────────────────────────── */
-      /*  GASTOS                     */
-      /* ─────────────────────────── */
+      /* ============================
+         VENTAS
+      ============================ */
+
+      match /ventas/{ventaId} {
+
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.total is number
+          && request.resource.data.fecha is timestamp;
+
+        allow delete: if false;
+      }
+
+      /* ============================
+         GASTOS
+      ============================ */
 
       match /gastos/{gastoId} {
 
         allow read:
-          if (perteneceAEmpresa(empresaId) && tieneFinanciero(empresaId))
-          || esSuperAdmin();
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
         allow create:
           if perteneceAEmpresa(empresaId)
-          && tieneFinanciero(empresaId)
           && empresaActiva(empresaId)
           && request.resource.data.valor is number
-          && request.resource.data.fecha is timestamp
-          && request.resource.data.valor > 0;
-
+          && request.resource.data.fecha is timestamp;
 
         allow update:
           if perteneceAEmpresa(empresaId)
-          && tieneFinanciero(empresaId)
           && empresaActiva(empresaId);
 
         allow delete: if false;
       }
 
-      /* ─────────────────────────── */
-      /*  OCR USAGE — BLINDADO       */
-      /* ─────────────────────────── */
+      /* ============================
+         OCR USAGE
+      ============================ */
 
       match /ocrUsage/{mesId} {
 
         allow read:
           if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        // Crear: count debe empezar en 1 exactamente
         allow create:
           if perteneceAEmpresa(empresaId)
           && tieneOCR(empresaId)
           && request.resource.data.count == 1;
 
-        // Update: solo se permite incrementar count en exactamente +1
-        // Esto hace imposible que el usuario resetee el contador a 0 manualmente
         allow update:
           if perteneceAEmpresa(empresaId)
           && tieneOCR(empresaId)
-          && request.resource.data.diff(resource.data)
-              .affectedKeys()
-              .hasOnly(['count'])
           && request.resource.data.count == resource.data.count + 1;
 
-
         allow delete: if false;
       }
 
-      /* ─────────────────────────── */
-      /*  LOGS                       */
-      /* ─────────────────────────── */
-
-      match /logs/{logId} {
-
-        allow read:
-          if esAdmin(empresaId) || esSuperAdmin();
-
-        allow create:
-          if perteneceAEmpresa(empresaId)
-          && request.resource.data.keys().hasAll(['accion','usuario','fecha'])
-          && request.resource.data.usuario == request.auth.uid;
-
-        allow update, delete: if false;
-      }
-
-      /* ─────────────────────────── */
-      /*  INVITACIONES               */
-      /* ─────────────────────────── */
-
-      match /invitaciones/{invId} {
-
-        allow read:
-          if perteneceAEmpresa(empresaId)
-          || resource.data.email == request.auth.token.email
-          || esSuperAdmin();
-
-        allow create:
-          if esAdmin(empresaId) && empresaActiva(empresaId);
-
-        allow update, delete:
-          if esAdmin(empresaId) || esSuperAdmin();
-      }
-
-      /* ─────────────────────────── */
-      /*  LIBRO DIARIO               */
-      /* ─────────────────────────── */
-
-      match /libroDiario/{asientoId} {
-
-        allow read:
-          if (perteneceAEmpresa(empresaId) && tieneContabilidad(empresaId))
-          || esSuperAdmin();
-
-        allow create:
-          if perteneceAEmpresa(empresaId)
-          && tieneContabilidad(empresaId)
-          && empresaActiva(empresaId)
-          && request.resource.data.cuadrado == true
-          && request.resource.data.lineas.size() >= 2
-          && request.resource.data.lineas.size() <= 100;
-
-
-        // Solo se permite anular asientos, nunca modificar valores contables
-        allow update:
-          if (esAdmin(empresaId) || esSuperAdmin())
-          && request.resource.data.diff(resource.data)
-             .affectedKeys()
-             .hasOnly(['anulado','anuladoPor','anuladoEn']);
-
-        allow delete: if false;
-      }
-
-      match /periodosCerrados/{periodoId} {
-
-        allow read:
-          if perteneceAEmpresa(empresaId) || esSuperAdmin();
-
-        allow create:
-          if (esAdmin(empresaId) || esSuperAdmin())
-          && tieneContabilidad(empresaId);
-
-        allow update, delete: if false;
-      }
-
-      /* ─────────────────────────── */
-      /*  ALERTAS CONTABLES          */
-      /* ─────────────────────────── */
-
-      match /alertasContables/{alertaId} {
-
-        allow read:
-          if perteneceAEmpresa(empresaId) || esSuperAdmin();
-
-        allow create:
-          if perteneceAEmpresa(empresaId) && tieneContabilidad(empresaId);
-
-        allow update, delete: if false;
-      }
     }
 
-    /* ═══════════════════════════════════════════════ */
-    /*  USUARIOS META — BLINDADO                      */
-    /* ═══════════════════════════════════════════════ */
+    /* ============================
+       USUARIOS META
+    ============================ */
 
     match /usuariosMeta/{uid} {
 
@@ -377,12 +250,11 @@ service cloud.firestore {
         || esSuperAdmin();
 
       allow create:
-      if isAuth()
-      && request.auth.uid == uid
-      && request.resource.data.keys().hasAll(['empresaId','email'])
-      && empresaExiste(request.resource.data.empresaId);
+        if isAuth()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasAll(['empresaId','email'])
+        && empresaExiste(request.resource.data.empresaId);
 
-      // empresaId NO puede cambiar — un usuario no puede moverse entre empresas por su cuenta
       allow update:
         if isAuth()
         && request.auth.uid == uid
@@ -391,44 +263,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    /* ═══════════════════════════════════════════════ */
-    /*  SUPERADMIN Y MÉTRICAS                         */
-    /* ═══════════════════════════════════════════════ */
+    /* ============================
+       SUPERADMIN
+    ============================ */
+
     match /superadmin/{uid} {
       allow read:
         if esSuperAdmin()
         || (isAuth() && request.auth.uid == uid);
 
-      allow create: if false; // SOLO DESDE CONSOLE
-      allow update, delete: if false;
+      allow write: if false;
     }
 
-
-    match /metricasSaas/{id} { allow read, write: if esSuperAdmin(); }
-    match /metricas/{id}     { allow read, write: if esSuperAdmin(); }
-    match /pagos/{id}        { allow read, write: if esSuperAdmin(); }
-
-    match /errores/{id} {
-      allow read:   if esSuperAdmin();
-      allow create: if isAuth();
-      allow update, delete: if false;
-    }
-
-    /* ─────────────────────────── */
-    /*  COLECCIÓN LEGACY (Usuarios) */
-    /* ─────────────────────────── */
-
-    match /Usuarios/{uid} {
-      allow read:
-        if (isAuth() && request.auth.uid == uid) || esSuperAdmin();
-      allow create, update:
-        if isAuth() && request.auth.uid == uid;
-      allow delete: if false;
-    }
-
-    /* ═══════════════════════════════════════════════ */
-    /*  BLOQUEO TOTAL POR DEFECTO                     */
-    /* ═══════════════════════════════════════════════ */
+    /* ============================
+       BLOQUEO TOTAL
+    ============================ */
 
     match /{document=**} {
       allow read, write: if false;

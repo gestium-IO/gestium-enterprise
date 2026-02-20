@@ -20,6 +20,8 @@ let _empresaId  = null;
 let _unsub      = null;
 let chartV = null, chartC = null, chartE = null;
 let filtroCliente = "";
+let filtroEstado = "";
+let filtroDia = null;
 let _mesActual  = null;
 
 export function initDashboard(empresaId) {
@@ -93,17 +95,33 @@ function calcularYRender(docs) {
   const ventasMes = [], estCount = {};
 
   let cantConf = 0;
-  docs.forEach(v => {
-    if (!v?.fecha) return;
-    if (v.eliminado === true || v.estado === "Cancelada") return;
-    const f = v.fecha.toDate();
-    if (f.getFullYear() !== anio || f.getMonth() !== mes) return;
-    const e = v.estado || "Pendiente";
-    estCount[e] = (estCount[e]||0)+1;
-    if (filtroCliente && String(v.cliente||"").trim().toLowerCase() !== filtroCliente.toLowerCase()) return;
-    cotizTotal += Number(v.total||0); cant++;
-    if (v.estado === "Convertida") { vendidoTotal += Number(v.total||0); ventasMes.push(v); cantConf++; }
-  });
+docs.forEach(v => {
+  if (!v?.fecha) return;
+  if (v.eliminado === true || v.estado === "Cancelada") return;
+
+  const f = v.fecha.toDate();
+
+  const diaActual = f.getDate();
+  if (filtroDia && diaActual !== filtroDia) return;
+
+  if (f.getFullYear() !== anio || f.getMonth() !== mes) return;
+
+  const e = v.estado || "Pendiente";
+
+  if (filtroEstado && e !== filtroEstado) return;
+  if (filtroCliente && String(v.cliente||"").trim().toLowerCase() !== filtroCliente.toLowerCase()) return;
+
+  estCount[e] = (estCount[e]||0)+1;
+
+  cotizTotal += Number(v.total||0);
+  cant++;
+
+  if (v.estado === "Convertida") {
+    vendidoTotal += Number(v.total||0);
+    ventasMes.push(v);
+    cantConf++;
+  }
+});
 
   // KPIs
   if ($("kpiCotizado"))  $("kpiCotizado").textContent  = clp(cotizTotal);
@@ -137,15 +155,64 @@ function calcularYRender(docs) {
         backgroundColor:dias.map((_,i)=>i%2===0?P.teal:P.orange),
         borderRadius:{topLeft:6,topRight:6}, borderSkipped:false,
         barPercentage:.6, categoryPercentage:.7, borderWidth:0 }]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false},
-          tooltip:{ backgroundColor:P.navy, titleColor:P.teal, bodyColor:"#e2e8f0", padding:12, displayColors:false,
-            callbacks:{ title:c=>"Día "+c[0].label.replace("D",""), label:c=>"Ventas: "+clp(c.raw) } }},
-        scales:{ x:{ grid:{display:false}, ticks:{font:{size:10,family:"Syne",weight:"700"},color:P.gray2}, border:{display:false} },
-          y:{ beginAtZero:true, grid:{color:"rgba(255,255,255,.04)"},
-            ticks:{font:{size:10,family:"JetBrains Mono"},color:P.gray2, callback:v=>"$"+Number(v/1000000).toFixed(1)+"M"},
-            border:{display:false} }},
-        animation:{ duration:500 } }
+      options:{ 
+  responsive:true, 
+  maintainAspectRatio:false,
+
+  plugins:{ 
+    legend:{display:false},
+    tooltip:{ 
+      backgroundColor:P.navy, 
+      titleColor:P.teal, 
+      bodyColor:"#e2e8f0", 
+      padding:12, 
+      displayColors:false,
+      callbacks:{ 
+        title:c=>"Día "+c[0].label.replace("D",""), 
+        label:c=>"Ventas: "+clp(c.raw) 
+      } 
+    }
+  },
+
+  scales:{ 
+    x:{ 
+      grid:{display:false}, 
+      ticks:{font:{size:10,family:"Syne",weight:"700"},color:P.gray2}, 
+      border:{display:false} 
+    },
+    y:{ 
+      beginAtZero:true, 
+      grid:{color:"rgba(255,255,255,.04)"},
+      ticks:{
+        font:{size:10,family:"JetBrains Mono"},
+        color:P.gray2, 
+        callback:v=>"$"+Number(v/1000000).toFixed(1)+"M"
+      },
+      border:{display:false} 
+    }
+  },
+
+  animation:{ duration:500 },
+
+  onClick:(evt)=>{
+    const pts = chartV.getElementsAtEventForMode(
+      evt,
+      "nearest",
+      { intersect:true },
+      true
+    );
+
+    if (!pts.length) {
+      filtroDia = null;
+    } else {
+      const diaSel = dias[pts[0].index];
+      filtroDia = (filtroDia === diaSel ? null : diaSel);
+    }
+
+    suscribirDashboard();
+  }
+},
+       
     });
   }
 
@@ -185,10 +252,44 @@ function renderEstados(estCount) {
     type:"doughnut",
     data:{ labels:estL, datasets:[{ data:estL.map(e=>estCount[e]),
       backgroundColor:estL.map(e=>estC[e]||P.gray2), borderColor:P.navy, borderWidth:3, hoverOffset:10 }]},
-    options:{ responsive:true, maintainAspectRatio:false, cutout:"65%",
-      plugins:{ legend:{ position:"right", labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}},
-        tooltip:{ backgroundColor:P.navy, titleColor:P.orange, bodyColor:"#e2e8f0", padding:12,
-          callbacks:{ label:c=>`${c.label}: ${c.raw}` } }},
-      animation:{ animateScale:true, duration:700 } }
+        options:{ 
+      responsive:true, 
+      maintainAspectRatio:false, 
+      cutout:"65%",
+      plugins:{ 
+        legend:{ 
+          position:"right",
+          labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}
+        },
+        tooltip:{ 
+          backgroundColor:P.navy, 
+          titleColor:P.orange, 
+          bodyColor:"#e2e8f0", 
+          padding:12,
+          callbacks:{ label:c=>`${c.label}: ${c.raw}` }
+        }
+      },
+      animation:{ animateScale:true, duration:700 },
+
+      // 🔴 AQUÍ VA EL FILTRO
+      onClick:(evt)=>{
+        const pts = chartE.getElementsAtEventForMode(
+          evt,
+          "nearest",
+          { intersect:true },
+          true
+        );
+
+        if (!pts.length) {
+          filtroEstado = "";
+        } else {
+          const estadoSel = estL[pts[0].index];
+          filtroEstado = (filtroEstado === estadoSel ? "" : estadoSel);
+        }
+
+        suscribirDashboard();
+      }
+    }
+
   });
 }

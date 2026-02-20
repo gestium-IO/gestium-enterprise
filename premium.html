@@ -1101,7 +1101,7 @@
     let empresaId=null, empresaData=null, usuarioData=null, logoB64=null;
     let chartV=null, chartC=null, chartE=null;
     let ventasMes=[], cotizTotal=0, vendidoTotal=0;
-    let filtroCliente="", filtroEstado="";
+    let filtroCliente="", filtroEstado="", filtroFecha=null;
 
     /* ── MODO REGISTRO ── */
     $("modeNuevaBtn").addEventListener("click",()=>{
@@ -1418,7 +1418,8 @@
           tx.set(doc(collection(db,"empresas",empresaId,"cotizaciones")),{
             numero:num,cliente,fecha:Timestamp.fromDate(new Date()),
             subtotal,iva:ivaT,total,m3:totalM3,estado:"Pendiente",
-            medidasTexto:texto,altura,precio,ivaPorcentaje:ivaP
+            medidasTexto:texto,altura,precio,ivaPorcentaje:ivaP,
+            eliminado:false
           });
         });
       } catch(e){ alert("Error: "+e); return; }
@@ -1572,7 +1573,7 @@
     $("moduloDashboard")?.addEventListener("dblclick", (evt)=>{
       if(evt.target.closest("canvas")) return; // solo si no es un gráfico
       if(filtroCliente||filtroEstado){
-        filtroCliente=""; filtroEstado="";
+        filtroCliente=""; filtroEstado=""; filtroFecha=null;
         document.querySelectorAll(".filtro-on").forEach(el=>el.classList.remove("filtro-on"));
         actualizarDashboard();
       }
@@ -1611,7 +1612,11 @@
           if(filtroCliente && String(v.cliente||"").trim().toLowerCase()!==filtroCliente.toLowerCase()) return;
           if(filtroEstado && (v.estado||"Pendiente")!==filtroEstado) return;
           cotizTotal+=Number(v.total||0); cantTotal++;
-          if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); cantConfirmadas++; }
+          if(v.estado==="Convertida"){
+            const diaV=v.fecha.toDate().getDate();
+            if(filtroFecha!=null && diaV!==filtroFecha) return;
+            vendidoTotal+=Number(v.total||0); ventasMes.push(v); cantConfirmadas++;
+          }
         }
       });
 
@@ -1662,7 +1667,16 @@
             x:{grid:{display:false},ticks:{font:{size:10,family:"Syne",weight:"700"},color:P.gray2},border:{display:false}},
             y:{beginAtZero:true,grid:{color:"rgba(255,255,255,.04)"},ticks:{font:{size:10,family:"JetBrains Mono"},color:P.gray2,callback:v=>"$"+Number(v/1000000).toFixed(1)+"M"},border:{display:false}}
           },
-          animation:{duration:700,easing:"easeOutQuart"}
+          animation:{duration:700,easing:"easeOutQuart"},
+          onClick:(evt)=>{
+            const pts=chartV.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);
+            if(pts.length){
+              const dia=dias[pts[0].index];
+              filtroFecha=(filtroFecha===dia?null:dia);
+            } else { filtroFecha=null; }
+            $("graficoVentas")?.parentElement?.parentElement?.classList.toggle("filtro-on",filtroFecha!=null);
+            actualizarDashboard();
+          }
         }
       });
 
@@ -1684,9 +1698,10 @@
               const pts=chartC.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);
               if(pts.length){ filtroCliente=(filtroCliente===clsCli[pts[0].index]?"":clsCli[pts[0].index]); }
               else { filtroCliente=""; }
-              filtroEstado="";
+              filtroEstado=""; filtroFecha=null;
               $("graficoClientes")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroCliente);
               $("graficoEstados")?.parentElement?.parentElement?.classList.remove("filtro-on");
+              $("graficoVentas")?.parentElement?.parentElement?.classList.remove("filtro-on");
               actualizarDashboard();
             }
           }
@@ -1718,8 +1733,9 @@
               const pts=chartE.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);
               if(pts.length){
                 const lbl=estLabels[pts[0].index];
-                filtroEstado=(filtroEstado===lbl?"":lbl);
+                filtroEstado=(filtroEstado===lbl?"":lbl); filtroFecha=null;
                 $("graficoEstados")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroEstado);
+                $("graficoVentas")?.parentElement?.parentElement?.classList.remove("filtro-on");
                 actualizarDashboard();
               }
             }

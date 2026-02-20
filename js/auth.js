@@ -190,6 +190,32 @@ export function initAuthState(callbacks) {
     try {
       if (!user) { callbacks.onLogout(); setLoading(false); return; }
 
+    // 🔴 1️⃣ Verificar si es superadmin GLOBAL
+  const superSnap = await getDoc(doc(db, "superadmin", user.uid));
+
+      if (superSnap.exists() && superSnap.data().activo === true) {
+        usuarioData = {
+          superadmin: true,
+          activo: true,
+          nombre: user.email,
+          rol: "superadmin"
+        };
+
+        // ✅ MODO GLOBAL
+        empresaId = "GLOBAL";
+
+        empresaData = {
+          nombre: "Gestium Global",
+          plan: "enterprise",
+          activa: true,
+          global: true
+        };
+
+        initFeatures(empresaData, usuarioData);
+        callbacks.onLogin(user, empresaId, empresaData, usuarioData);
+        setLoading(false);
+        return;
+      }
       // 🔴 CRÍTICO: Buscar usuario en superadmin primero,
       // luego en subcolecciones de empresas
       // Estrategia: el user token custom claims o buscar en empresas conocidas.
@@ -230,14 +256,23 @@ export function initAuthState(callbacks) {
       usuarioData = uData;
       if (!usuarioData.activo) { await doSignOut(); toast("Usuario desactivado.", "warn"); return; }
 
-      empresaId = eId;
+            empresaId = eId;
       localStorage.setItem(`gestium_emp_${user.uid}`, empresaId);
 
-      const eSnap = await getDoc(doc(db, "empresas", empresaId));
-      if (!eSnap.exists()) { await doSignOut(); toast("Empresa no encontrada.", "error"); return; }
+      // 🔵 Solo cargar empresa si NO es modo GLOBAL
+      let eSnap = null;
 
-      empresaData = eSnap.data() || {};
+      if (empresaId !== "GLOBAL") {
+        eSnap = await getDoc(doc(db, "empresas", empresaId));
 
+        if (!eSnap.exists()) {
+          await doSignOut();
+          toast("Empresa no encontrada.", "error");
+          return;
+        }
+
+        empresaData = eSnap.data() || {};
+      }
       // Suspensión
       if (empresaData.activa === false) { callbacks.onSuspended("Cuenta suspendida. Contacta al soporte."); return; }
 

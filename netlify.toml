@@ -6,16 +6,26 @@
   node_bundler = "esbuild"
 
 # ── REDIRECTS ──────────────────────────────────────────────
+
+# Página principal → landing (marketing + planes)
 [[redirects]]
   from = "/"
   to   = "/landing.html"
   status = 200
 
+# App Premium (login)
 [[redirects]]
   from = "/app"
   to   = "/app.html"
   status = 200
 
+# App Premium por nombre legacy
+[[redirects]]
+  from = "/premium"
+  to   = "/premium.html"
+  status = 200
+
+# Landing directa
 [[redirects]]
   from = "/landing"
   to   = "/landing.html"

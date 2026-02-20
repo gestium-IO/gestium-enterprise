@@ -368,7 +368,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   const fmt=f=>{ const d=f instanceof Date?f:new Date(f); return d.toLocaleString("es-CO",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}); };
   const clp=n=>"$ "+Number(n).toLocaleString("es-CO");
   let empresaId=null,empresaData=null,usuarioData=null,logoB64=null;
-  let chartV=null,chartC=null,chartE=null,ventasMes=[],cotizTotal=0,vendidoTotal=0,filtroCliente="";
+  let chartV=null,chartC=null,chartE=null,ventasMes=[],cotizTotal=0,vendidoTotal=0,filtroCliente="",filtroEstado="";
 
   $("modeNuevaBtn").addEventListener("click",()=>{ $("regModoEmpresa").value="nueva"; $("modeNuevaBtn").classList.add("on"); $("modeExistenteBtn").classList.remove("on"); $("bloqueNuevaEmpresa").style.display="block"; $("bloqueEmpresaExistente").style.display="none"; });
   $("modeExistenteBtn").addEventListener("click",()=>{ $("regModoEmpresa").value="existente"; $("modeExistenteBtn").classList.add("on"); $("modeNuevaBtn").classList.remove("on"); $("bloqueNuevaEmpresa").style.display="none"; $("bloqueEmpresaExistente").style.display="block"; });
@@ -518,7 +518,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     texto.split("\n").forEach(raw=>{
       let l=raw.trim().replace(/\s+/g,""); if(!l) return;
       let cant=1; if(l.includes("-")){ const p=l.split("-"); cant=parseInt(p[0])||1; l=p[1]; }
-      const pts=l.includes("*")?l.split("*"):l.split("x"); const a=parseFloat(pts[0]),b=parseFloat(pts[1]); if(!a||!b) return;
+      l=l.toUpperCase(); const pts=l.includes("*")?l.split("*"):l.split("X"); const a=parseFloat(pts[0]),b=parseFloat(pts[1]); if(!a||!b) return;
       const m3=(a/100)*(b/100)*(altura/100)*cant,tl=m3*precio; subtotal+=tl; totalM3+=m3;
       filas.push([cant,a,b,altura,m3.toFixed(3),clp(tl)]);
     });
@@ -568,7 +568,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     d.medidasTexto.split("\n").forEach(raw=>{
       let l=raw.trim().replace(/\s+/g,""); if(!l) return;
       let cant=1; if(l.includes("-")){ const p=l.split("-"); cant=parseInt(p[0])||1; l=p[1]; }
-      const pts=l.includes("*")?l.split("*"):l.split("x"); const a=parseFloat(pts[0]),b=parseFloat(pts[1]);
+      l=l.toUpperCase(); const pts=l.includes("*")?l.split("*"):l.split("X"); const a=parseFloat(pts[0]),b=parseFloat(pts[1]);
       const m3=(a/100)*(b/100)*(d.altura/100)*cant; filas.push([cant,a,b,d.altura,m3.toFixed(3),clp(m3*d.precio)]);
     });
     try{ docPdf.autoTable({startY:sy+14,head:[["Cant","Ancho cm","Largo cm","Altura cm","m³","Total"]],body:filas,theme:"grid",headStyles:{fillColor:[7,13,26],textColor:[6,214,200],fontStyle:"bold",fontSize:9},styles:{halign:"center",cellPadding:8,fontSize:10},margin:{left:38,right:38}}); }catch(e){}
@@ -584,13 +584,13 @@ window.addEventListener('DOMContentLoaded',()=>{
     const ref=doc(db,"empresas",empresaId,"cotizaciones",id);
     if(accion==="Confirmar"){ const s=await getDoc(ref); if(!s.exists()) return; const d=s.data(); if(d.estado==="Convertida") return; await updateDoc(ref,{estado:"Convertida"}); }
     else if(accion==="Pendiente"){ await updateDoc(ref,{estado:"Pendiente"}); }
-    else if(accion==="Eliminar"){ if(!confirm("¿Eliminar cotización?")) return; await deleteDoc(ref); }
+    else if(accion==="Eliminar"){ if(!confirm("¿Eliminar cotización? Se ocultará del sistema.")) return; await updateDoc(ref,{estado:"Cancelada"}); }
     cargarTablaCotizaciones(); actualizarDashboard();
   };
 
   async function cargarTablaCotizaciones(){
     if(!empresaId) return;
-    const snap=await getDocs(query(collection(db,"empresas",empresaId,"cotizaciones"),orderBy("fecha","desc")));
+    const snap=await getDocs(query(collection(db,"empresas",empresaId,"cotizaciones"),where("estado","!=","Cancelada"),orderBy("estado"),orderBy("fecha","desc")));
     const tbody=document.querySelector("#tablaCotizaciones tbody"); tbody.innerHTML="";
     snap.forEach(ds=>{
       const d=ds.data(); if(!d.fecha) return; const f=d.fecha.toDate();
@@ -647,6 +647,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   });
 
   $("actualizarDashboard").addEventListener("click",actualizarDashboard);
+  $("moduloDashboard")?.addEventListener("dblclick",(evt)=>{
+    if(evt.target.closest("canvas")) return;
+    if(filtroCliente||filtroEstado){
+      filtroCliente=""; filtroEstado="";
+      document.querySelectorAll(".filtro-on").forEach(el=>el.classList.remove("filtro-on"));
+      actualizarDashboard();
+    }
+  });
   async function actualizarDashboard(){
     if(!empresaId) return;
     document.body.style.cursor="wait";
@@ -658,21 +666,22 @@ window.addEventListener('DOMContentLoaded',()=>{
     const snap=await getDocs(query(collection(db,"empresas",empresaId,"cotizaciones"),
       where("fecha",">=",Timestamp.fromDate(inicioMes)),
       where("fecha","<=",Timestamp.fromDate(finMes)),
-      where("eliminado","!=",true),
-      orderBy("eliminado"),orderBy("fecha","desc")));
+      orderBy("fecha","desc")));
     const docs=[]; snap.forEach(d=>docs.push({id:d.id,...d.data()}));
-    cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cant=0;
+    cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cant=0, cantConf=0;
     const estCount={};
     docs.forEach(v=>{
       if(!v?.fecha) return;
+      if(v.estado==="Cancelada") return;
       const e=v.estado||"Pendiente"; estCount[e]=(estCount[e]||0)+1;
       if(filtroCliente&&String(v.cliente||"").trim().toLowerCase()!==filtroCliente.toLowerCase()) return;
+      if(filtroEstado&&(v.estado||"Pendiente")!==filtroEstado) return;
       cotizTotal+=Number(v.total||0); cant++;
-      if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); }
+      if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); cantConf++; }
     });
     $("kpiCotizado").textContent=clp(cotizTotal);
     $("kpiVentas").textContent=clp(vendidoTotal);
-    $("kpiConversion").textContent=(cotizTotal>0?((vendidoTotal/cotizTotal)*100).toFixed(1):0)+"%";
+    $("kpiConversion").textContent=(cant>0?(cantConf/cant*100).toFixed(1):0)+"%";
     $("kpiCantidad").textContent=cant;
 
     if(!ventasMes.length){ [chartV,chartC,chartE].forEach(c=>{if(c)c.destroy();}); chartV=chartC=chartE=null; renderEstados(estCount); document.body.style.cursor="default"; return; }
@@ -696,7 +705,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       chartC=new Chart(canvasC,{
         type:"doughnut",
         data:{labels:clsCli,datasets:[{data:clsCli.map(c=>vpc[c]),backgroundColor:PALETTE,borderColor:P.navy,borderWidth:3,hoverOffset:14}]},
-        options:{responsive:true,maintainAspectRatio:false,cutout:"70%",plugins:{legend:{position:"right",labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}},tooltip:{backgroundColor:P.navy,titleColor:P.teal,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${clp(c.raw)}`}}},animation:{animateScale:true,duration:900},onClick:(evt)=>{ const pts=chartC.getElementsAtEventForMode(evt,"nearest",{intersect:true},true); filtroCliente=pts.length?(filtroCliente===clsCli[pts[0].index]?"":clsCli[pts[0].index]):""; $("graficoClientes").parentElement.parentElement.classList.toggle("filtro-on",!!filtroCliente); actualizarDashboard(); }}
+        options:{responsive:true,maintainAspectRatio:false,cutout:"70%",plugins:{legend:{position:"right",labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0",generateLabels:chart=>{return chart.data.labels.map((l,i)=>{const v=chart.data.datasets[0].data[i];return{text:l+": "+clp(v),fillStyle:chart.data.datasets[0].backgroundColor[i],strokeStyle:chart.data.datasets[0].backgroundColor[i],lineWidth:0,hidden:false,index:i};});}}},tooltip:{backgroundColor:P.navy,titleColor:P.teal,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${clp(c.raw)}`}}},animation:{animateScale:true,duration:900},onClick:(evt)=>{ const pts=chartC.getElementsAtEventForMode(evt,"nearest",{intersect:true},true); if(pts.length){filtroCliente=(filtroCliente===clsCli[pts[0].index]?"":clsCli[pts[0].index]);}else{filtroCliente="";} filtroEstado=""; $("graficoClientes")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroCliente); $("graficoEstados")?.parentElement?.parentElement?.classList.remove("filtro-on"); actualizarDashboard(); }}
       });
     }
     renderEstados(estCount);
@@ -708,7 +717,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(chartE) chartE.destroy();
     if(estL.length){
       const canvasE=$("graficoEstados"); canvasE.style.height="270px";
-      chartE=new Chart(canvasE,{type:"doughnut",data:{labels:estL,datasets:[{data:estL.map(e=>estCount[e]),backgroundColor:estL.map(e=>estC[e]||P.gray2),borderColor:P.navy,borderWidth:3,hoverOffset:10}]},options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"right",labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}},tooltip:{backgroundColor:P.navy,titleColor:P.orange,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${c.raw}`}}},animation:{animateScale:true,duration:800}}});
+      chartE=new Chart(canvasE,{type:"doughnut",data:{labels:estL,datasets:[{data:estL.map(e=>estCount[e]),backgroundColor:estL.map(e=>estC[e]||P.gray2),borderColor:P.navy,borderWidth:3,hoverOffset:10}]},options:{responsive:true,maintainAspectRatio:false,cutout:"65%",plugins:{legend:{position:"right",labels:{boxWidth:10,padding:12,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0",generateLabels:chart=>{return chart.data.labels.map((l,i)=>{const v=chart.data.datasets[0].data[i];return{text:l+": "+v,fillStyle:chart.data.datasets[0].backgroundColor[i],strokeStyle:chart.data.datasets[0].backgroundColor[i],lineWidth:0,hidden:false,index:i};});}}},tooltip:{backgroundColor:P.navy,titleColor:P.orange,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${c.raw} cotizaciones`}}},animation:{animateScale:true,duration:800},onClick:(evt)=>{const pts=chartE.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);if(pts.length){const lbl=estL[pts[0].index];filtroEstado=(filtroEstado===lbl?"":lbl);$("graficoEstados")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroEstado);$("graficoClientes")?.parentElement?.parentElement?.classList.remove("filtro-on");filtroCliente="";actualizarDashboard();}}}});
     }
   }
 

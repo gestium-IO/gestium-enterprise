@@ -134,7 +134,6 @@ export async function generarCotizacion() {
       altura,
       precio,
       ivaPorcentaje: ivaP,
-      eliminado: false,
     });
   });
   } catch(e) { toast("Error al guardar: "+e.message, "error"); return; }
