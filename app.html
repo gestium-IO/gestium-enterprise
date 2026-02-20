@@ -1098,15 +1098,41 @@ $("overlay")?.addEventListener("click", () => {
 
 // ── Usuarios ──
 async function cargarUsuarios() {
-  const tbody = document.querySelector("#tablaUsuarios tbody"); if(!tbody) return;
+  const tbody = document.querySelector("#tablaUsuarios tbody");
+  if(!tbody) return;
+
   const { empresaId } = await import('./js/auth.js');
-  const snap = await getDocs(query(collection(db,"Usuarios"), where("empresaId","==",empresaId)));
+
+  const snap = await getDocs(
+    collection(db,"empresas", empresaId, "usuarios")
+  );
+
   tbody.innerHTML="";
+
   snap.forEach(ds => {
-    const u=ds.data();
-    const rol=u.superadmin?'<span class="badge badge-purple">Superadmin</span>':u.rol==="admin"?'<span class="badge badge-teal">Admin</span>':'<span class="badge badge-gray">'+(u.rol||"vendedor")+'</span>';
-    const est=u.activo?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>';
-    tbody.innerHTML+=`<tr><td>${[u.nombre,u.apellido].filter(Boolean).join(" ")}</td><td style="font-size:11px">${u.email||"-"}</td><td>${u.cargo||"-"}</td><td>${rol}</td><td>${est}</td><td class="mono" style="font-size:10px;color:var(--text3)">${(u.empresaId||"").slice(0,14)}…</td></tr>`;
+    const u = ds.data();
+
+    const rol = u.superadmin
+      ? '<span class="badge badge-purple">Superadmin</span>'
+      : u.rol==="admin"
+        ? '<span class="badge badge-teal">Admin</span>'
+        : '<span class="badge badge-gray">'+(u.rol||"vendedor")+'</span>';
+
+    const est = u.activo
+      ? '<span class="badge badge-green">Activo</span>'
+      : '<span class="badge badge-red">Inactivo</span>';
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${[u.nombre,u.apellido].filter(Boolean).join(" ")}</td>
+        <td style="font-size:11px">${u.email||"-"}</td>
+        <td>${u.cargo||"-"}</td>
+        <td>${rol}</td>
+        <td>${est}</td>
+        <td class="mono" style="font-size:10px;color:var(--text3)">
+          ${(u.empresaId||"").slice(0,14)}…
+        </td>
+      </tr>`;
   });
 }
 

@@ -16,7 +16,7 @@ export function toast(msg, tipo = "info", duracion = 3500) {
   let el = document.getElementById("toastGlobal");
   if (!el) {
     el = document.createElement("div");
-    el.id = "toastGlobal";
+    el.id = "toastGlobal";  
     el.style.cssText = `
       position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
       padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;
@@ -148,4 +148,39 @@ export function lockBtn(btn, textoLoading = "Procesando...") {
   btn.disabled    = true;
   btn.textContent = textoLoading;
   return () => { btn.disabled = false; btn.textContent = original; };
+}
+
+// ── FORMATO METROS CÚBICOS ─────────────────────────────────────────
+// Elimina ceros innecesarios: 85.500 → 85.5  |  1.000 → 1
+export function fmtM3(n) {
+  return parseFloat(parseFloat(n).toFixed(3)).toString();
+}
+
+// ── RATE LIMIT LOCAL (localStorage) ───────────────────────────────
+// Controla cuántas veces se puede ejecutar una acción en una ventana de tiempo.
+// key: identificador único (ej: "cotizaciones_dia_empresaId")
+// maxAcciones: límite permitido (ej: 50)
+// ventanaMs: milisegundos de la ventana (ej: 86400000 = 24h)
+// Retorna true si está dentro del límite, false si ya lo superó.
+export function checkRateLimit(key, maxAcciones, ventanaMs = 86400000) {
+  try {
+    const ahora  = Date.now();
+    const rawData = localStorage.getItem("rl_" + key);
+    let data = rawData ? JSON.parse(rawData) : { count: 0, desde: ahora };
+
+    // Si la ventana de tiempo expiró, reiniciar
+    if (ahora - data.desde > ventanaMs) {
+      data = { count: 0, desde: ahora };
+    }
+
+    if (data.count >= maxAcciones) {
+      return false; // Límite alcanzado
+    }
+
+    data.count++;
+    localStorage.setItem("rl_" + key, JSON.stringify(data));
+    return true;
+  } catch {
+    return true; // Si localStorage falla, dejar pasar (no bloquear al usuario)
+  }
 }

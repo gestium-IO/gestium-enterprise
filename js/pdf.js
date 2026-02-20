@@ -187,3 +187,141 @@ export async function generarReporte(empresaData, usuarioData, logoB64, mesStr, 
   const nombreArchivo = `GESTIUM_Reporte_${anio}-${mes}_${(empresaData?.nombre || "empresa").replace(/\s+/g, "_")}.pdf`;
   doc.save(nombreArchivo);
 }
+
+// ── GENERAR PDF DE COTIZACIÓN INDIVIDUAL ──────────────────────────
+// Llamado desde cotizaciones.js con los datos de la cotización
+export function generarPDF(empresaData, usuarioData, logoB64, filas, { num, cliente, subtotal, ivaT, ivaP, total }) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+
+  // ── Watermark
+  function addWatermark() {
+    const ph = doc.internal.pageSize.getHeight();
+    try {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.04 }));
+      doc.setFont("helvetica","bold"); doc.setFontSize(48);
+      doc.setTextColor(6,214,200);
+      doc.text("GESTIUM", pw/2, ph/2, { align:"center", angle:45 });
+      doc.restoreGraphicsState();
+    } catch(e){}
+    doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.setFont("helvetica","normal");
+    doc.text("GESTIUM · Inteligencia Operativa · WA: +57 300 554 1411 · gestium.inteligencia@gmail.com", pw/2, ph-10, { align:"center" });
+  }
+
+  // ── Header GESTIUM
+  const H = 96;
+  const emp = empresaData || {};
+  doc.setFillColor(7,13,26); doc.rect(0,0,pw,H,"F");
+  doc.setFillColor(6,214,200); doc.rect(0,0,pw,3,"F");
+  doc.setFillColor(249,115,22); doc.rect(0,H-3,pw,3,"F");
+
+  if (logoB64) {
+    try {
+      const t = logoB64.startsWith("data:image/png") ? "PNG" : "JPEG";
+      doc.addImage(logoB64, t, 34, 12, 80, 44);
+    } catch(e){}
+  }
+
+  doc.setTextColor(255,255,255);
+  doc.setFont("helvetica","bold"); doc.setFontSize(16);
+  doc.text(emp.nombre||"Mi Empresa", pw-34, 26, { align:"right" });
+  doc.setFont("helvetica","normal"); doc.setFontSize(8);
+  let yd = 38;
+  if (emp.nit)     { doc.text("NIT: "+emp.nit, pw-34, yd, {align:"right"}); yd+=10; }
+  const dir = [emp.direccion, emp.ciudad, emp.pais].filter(Boolean).join(", ");
+  if (dir)         { doc.text(dir, pw-34, yd, {align:"right"}); yd+=10; }
+  if (emp.telefono){ doc.text("Tel: "+emp.telefono, pw-34, yd, {align:"right"}); yd+=10; }
+  if (emp.web)     { doc.text(emp.web, pw-34, yd, {align:"right"}); yd+=10; }
+  if (emp.email)   { doc.text(emp.email, pw-34, yd, {align:"right"}); }
+
+  // ── Número de cotización
+  doc.setFillColor(249,115,22); doc.rect(34, H+10, 6, 30, "F");
+  doc.setTextColor(249,115,22); doc.setFont("helvetica","bold"); doc.setFontSize(13);
+  doc.text("Cotización: "+num, 44, H+22);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(80,80,80);
+  const ahora = new Date();
+  const fechaStr = ahora.toLocaleString("es-CO",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+  doc.text("Fecha: "+fechaStr, 44, H+34);
+
+  const asesor = [usuarioData?.nombre, usuarioData?.apellido].filter(Boolean).join(" ");
+  if (asesor || usuarioData?.celular) {
+    let ya = H+46;
+    if (asesor)           { doc.text("Asesor: "+asesor+(usuarioData?.cargo?" · "+usuarioData.cargo:""), 44, ya); ya+=12; }
+    if (usuarioData?.celular){ doc.text("Cel: "+usuarioData.celular, 44, ya); }
+  }
+
+  addWatermark();
+
+  // ── Cliente
+  let sy = H + 75;
+  doc.setFontSize(10); doc.setTextColor(30,30,30);
+  doc.setFont("helvetica","bold"); doc.text("Cliente:", 34, sy);
+  doc.setFont("helvetica","normal"); doc.text(cliente, 60, sy);
+  sy += 14;
+
+  // ── Tabla de ítems
+  const heads = [["Cant","Ancho (cm)","Largo (cm)","Alto (cm)","m³","Subtotal"]];
+  const body  = filas.map(f => f.map(String));
+
+  // Intentar usar autoTable si está disponible
+  if (typeof doc.autoTable === "function") {
+    doc.autoTable({
+      head: heads, body,
+      startY: sy,
+      margin: { left:34, right:34 },
+      headStyles: { fillColor:[7,13,26], textColor:[6,214,200], fontStyle:"bold", fontSize:8 },
+      bodyStyles: { fontSize:8, textColor:[40,40,40] },
+      alternateRowStyles: { fillColor:[245,250,252] },
+      columnStyles: { 0:{halign:"center"}, 4:{halign:"right"}, 5:{halign:"right",fontStyle:"bold"} },
+    });
+    sy = (doc.lastAutoTable?.finalY || sy) + 10;
+  } else {
+    // Fallback manual si no hay autoTable
+    doc.setFontSize(8); doc.setFont("helvetica","bold");
+    const cols = ["Cant","Ancho","Largo","Alto","m³","Subtotal"];
+    const widths = [15,30,30,25,25,45];
+    let cx = 34;
+    doc.setFillColor(7,13,26); doc.rect(34, sy-5, pw-68, 10, "F");
+    doc.setTextColor(6,214,200);
+    cols.forEach((c,i)=>{ doc.text(c, cx+2, sy+1); cx+=widths[i]; });
+    sy+=10; doc.setFont("helvetica","normal"); doc.setTextColor(40,40,40);
+    filas.forEach((fila,ri)=>{
+      if(ri%2===0){ doc.setFillColor(245,250,252); doc.rect(34,sy-4,pw-68,8,"F"); }
+      cx=34; fila.forEach((v,i)=>{ doc.text(String(v),cx+2,sy+1); cx+=widths[i]; });
+      sy+=8;
+    });
+    sy+=6;
+  }
+
+  // ── Totales
+  const totales = [
+    ["Subtotal:", clpLocal(subtotal)],
+    [`IVA (${ivaP}%):`, clpLocal(ivaT)],
+    ["TOTAL:", clpLocal(total)],
+  ];
+  totales.forEach(([label, valor], i)=>{
+    const isLast = i === totales.length-1;
+    if(isLast){
+      doc.setFillColor(7,13,26); doc.rect(pw-134, sy-5, 100, 10, "F");
+      doc.setTextColor(6,214,200); doc.setFont("helvetica","bold"); doc.setFontSize(10);
+    } else {
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(60,60,60);
+    }
+    doc.text(label, pw-130, sy+1); doc.text(valor, pw-34, sy+1, {align:"right"});
+    sy+=12;
+  });
+
+  // ── Nota al pie
+  sy += 8;
+  doc.setFontSize(7.5); doc.setFont("helvetica","italic"); doc.setTextColor(120,120,120);
+  doc.text("Cotización válida por 30 días. Precios expresados en COP. " + (emp.nombre||"GESTIUM"), 34, sy);
+
+  doc.save(`Cotizacion_${num}_${cliente.replace(/\s+/g,"_")}.pdf`);
+}
+
+function clpLocal(n) {
+  return "$" + Math.round(n).toLocaleString("es-CO");
+}

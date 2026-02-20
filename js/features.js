@@ -28,6 +28,7 @@ export const PLAN_LIMITS = {
   premium:      { cotizacionesDia:50,   pdfHora:10,  gastos:true,  contabilidad:false, ocr:false },
   superpremium: { cotizacionesDia:999,  pdfHora:999, gastos:true,  contabilidad:true,  ocr:true  },
   superadmin:   { cotizacionesDia:9999, pdfHora:999, gastos:true,  contabilidad:true,  ocr:true  },
+
 };
 
 export const PLAN_FEATURES = {

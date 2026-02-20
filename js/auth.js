@@ -206,7 +206,7 @@ export function initAuthState(callbacks) {
 
         empresaData = {
           nombre: "Gestium Global",
-          plan: "enterprise",
+          plan: "superadmin",
           activa: true,
           global: true
         };
