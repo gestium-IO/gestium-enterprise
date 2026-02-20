@@ -5,7 +5,7 @@
 
 import { db } from './firebase.js';
 import {
-  collection, getDocs, getDoc, updateDoc, addDoc,
+  collection, getDocs, getDoc, setDoc, updateDoc, addDoc,
   doc, query, where, orderBy, limit, Timestamp
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { $, clp, fmtShort, fmt, toast } from './utils.js';
@@ -23,23 +23,27 @@ export async function cargarSuperadmin() {
   if (!grid) return;
   grid.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text3);font-size:13px">Cargando empresas...</div>';
 
-  const snap = await getDocs(collection(db,"empresas"));
+  // ✅ FIX: Una sola query, sin subqueries por empresa
+  // Los contadores se leen de los campos guardados en cada empresa (userCount, cotCount)
+  // ✅ FIX: limit(200) para escalar — con paginación por startAfter si se necesita más
+  const snap = await getDocs(
+    query(collection(db,"empresas"), orderBy("creadaEn","desc"), limit(200))
+  );
   let total=0, activas=0, trial=0, premium=0, mrr=0;
   const empresas = [];
 
-  for (const eDoc of snap.docs) {
+  snap.docs.forEach(eDoc => {
     const e = { id:eDoc.id, ...eDoc.data() };
-    const usersSnap = await getDocs(collection(db,"empresas",e.id,"usuarios"));
-    e._userCount = usersSnap.size;
-    const cotSnap = await getDocs(collection(db,"empresas",e.id,"cotizaciones"));
-    e._cotCount = cotSnap.size;
+    // Leer contadores cacheados del documento empresa (evitar subqueries O(N))
+    e._userCount = e.userCount ?? "—";
+    e._cotCount  = e.cotCount  ?? "—";
     empresas.push(e);
     total++;
     if (e.activa !== false) activas++;
     if (e.plan === "trial")    trial++;
-    if (e.plan === "premium" || e.plan === "superpremium")  premium++;
+    if (e.plan === "premium" || e.plan === "superpremium") premium++;
     mrr += (MRR_PLANS[e.plan] || 0);
-  }
+  });
 
   // KPIs
   if($("saKpiTotal"))   $("saKpiTotal").textContent   = total;
@@ -48,14 +52,18 @@ export async function cargarSuperadmin() {
   if($("saKpiPremium")) $("saKpiPremium").textContent = premium;
   if($("saKpiMrr"))     $("saKpiMrr").textContent     = clp(mrr);
 
-  // Guardar snapshot de métricas históricas
+  // ✅ FIX: Guardar métricas solo una vez por día (no en cada carga)
   try {
-    await addDoc(collection(db,"metricas"), {
-      fecha:Timestamp.fromDate(new Date()),
-      total, activas, trial, premium,
-      mrr,
-      basicoCount: empresas.filter(e=>e.plan==="basico").length,
-    });
+    const hoy = new Date().toISOString().slice(0,10); // "YYYY-MM-DD"
+    const metricaRef = doc(db, "metricasSaas", hoy);
+    const metricaSnap = await getDoc(metricaRef);
+    if (!metricaSnap.exists()) {
+      await setDoc(metricaRef, {
+        fecha: Timestamp.fromDate(new Date()),
+        total, activas, trial, premium, mrr,
+        basicoCount: empresas.filter(e=>e.plan==="basico").length,
+      });
+    }
   } catch(e) {}
 
   renderEmpresasGrid(empresas);
@@ -68,8 +76,10 @@ function renderEmpresasGrid(empresas) {
   const estadoBadge = a => a!==false?'<span class="badge badge-green">Activa</span>':'<span class="badge badge-red">Suspendida</span>';
 
   grid.innerHTML = empresas.map(e => {
-    const vencDias = e.vencimiento
-      ? Math.ceil((e.vencimiento.toDate()-new Date())/(1000*60*60*24))
+    // ✅ FIX: Unificado — usar fechaVencimiento con fallback a vencimiento
+    const vencRef = e.fechaVencimiento || e.vencimiento;
+    const vencDias = vencRef
+      ? Math.ceil((vencRef.toDate()-new Date())/(1000*60*60*24))
       : null;
     const vencColor = vencDias == null ? "" : vencDias < 3 ? "color:var(--red)" : vencDias < 7 ? "color:var(--amber)" : "color:var(--text)";
     return `<div class="empresa-card">

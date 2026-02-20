@@ -5,7 +5,7 @@
 
 import { db } from './firebase.js';
 import {
-  collection, query, orderBy, where, onSnapshot
+  collection, query, orderBy, where, onSnapshot, Timestamp
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { $, clp } from './utils.js';
 
@@ -30,7 +30,7 @@ export function setFiltroCliente(c) { filtroCliente = c; }
 export function getFiltroCliente()  { return filtroCliente; }
 
 /* ── SUSCRIBIR DASHBOARD EN TIEMPO REAL ── */
-export function suscribirDashboard() {
+export async function suscribirDashboard() {
   if (!_empresaId) return;
   if (_unsub) _unsub();
 
@@ -41,10 +41,27 @@ export function suscribirDashboard() {
   }
   _mesActual = mesInput?.value;
 
+  // ✅ FIX: Filtrar por fecha en query, no en cliente (escalabilidad)
+  // Cargamos el mes seleccionado + 1 mes atrás para tener contexto
+  const mesInput2 = document.getElementById("mesReporte");
+  const mesVal = mesInput2?.value;
+  let inicioQuery, finQuery;
+  if (mesVal) {
+    const [y, m] = mesVal.split("-").map(Number);
+    inicioQuery = new Date(y, m-1, 1);
+    finQuery    = new Date(y, m, 0, 23, 59, 59);
+  } else {
+    const h = new Date();
+    inicioQuery = new Date(h.getFullYear(), h.getMonth(), 1);
+    finQuery    = new Date(h.getFullYear(), h.getMonth()+1, 0, 23, 59, 59);
+  }
+
   _unsub = onSnapshot(
     query(
       collection(db,"empresas",_empresaId,"cotizaciones"),
       where("eliminado","!=",true),
+      where("fecha",">=",Timestamp.fromDate(inicioQuery)),
+      where("fecha","<=",Timestamp.fromDate(finQuery)),
       orderBy("eliminado"),
       orderBy("fecha","desc")
     ),

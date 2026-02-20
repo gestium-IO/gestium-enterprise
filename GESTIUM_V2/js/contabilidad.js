@@ -30,7 +30,7 @@ export const PLAN_CUENTAS = {
   "1305": { nombre:"Clientes (CxC)",         tipo:"activo",    naturaleza:"debito"  },
   "1330": { nombre:"Anticipos de clientes",  tipo:"activo",    naturaleza:"debito"  },
   "1524": { nombre:"Equipos y maquinaria",   tipo:"activo",    naturaleza:"debito"  },
-  "1792": { nombre:"Gastos pagados anticiop",tipo:"activo",    naturaleza:"debito"  },
+  "1792": { nombre:"Gastos pagados anticipo",tipo:"activo",    naturaleza:"debito"  },
   "2205": { nombre:"Proveedores (CxP)",      tipo:"pasivo",    naturaleza:"credito" },
   "2365": { nombre:"IVA por pagar",          tipo:"pasivo",    naturaleza:"credito" },
   "2367": { nombre:"Retenciones por pagar",  tipo:"pasivo",    naturaleza:"credito" },
@@ -274,20 +274,28 @@ export async function calcularBalance() {
     if (cta.tipo==="pasivo")     pasivos    += s;
     if (cta.tipo==="patrimonio") patrimonio += s;
   });
-  return { activos, pasivos, patrimonio, cuadrado: Math.abs(activos-(pasivos+patrimonio))<10, saldos };
+  return { activos, pasivos, patrimonio, cuadrado: Math.abs(activos-(pasivos+patrimonio))<1, saldos };
 }
 
 // ══════════════════════════════════════════════════════
 // NIVEL 1 · FLUJO DE CAJA REAL
 // ══════════════════════════════════════════════════════
 export async function calcularFlujoCaja(mes) {
-  const snap = await getDocs(collection(db,"empresas",_empId,"libroDiario"));
   const [anio, mesN] = mes.split("-").map(Number);
+  const inicioMes = new Date(anio, mesN-1, 1);
+  const finMes    = new Date(anio, mesN, 0, 23, 59, 59);
+  // ✅ FIX: filtro por fecha en query, no en cliente (escalabilidad)
+  const snap = await getDocs(
+    query(
+      collection(db,"empresas",_empId,"libroDiario"),
+      where("fecha", ">=", Timestamp.fromDate(inicioMes)),
+      where("fecha", "<=", Timestamp.fromDate(finMes)),
+      orderBy("fecha","asc")
+    )
+  );
   let entradas=0, salidas=0;
   snap.forEach(d => {
-    const doc = d.data(); if (!doc.fecha) return;
-    const f = doc.fecha.toDate();
-    if (f.getFullYear()!==anio || f.getMonth()+1!==mesN) return;
+    const doc = d.data();
     doc.lineas?.forEach(l => {
       if (l.cuenta==="1110" || l.cuenta==="1105") {
         const val = Number(l.valor||0);
@@ -303,17 +311,42 @@ export async function calcularFlujoCaja(mes) {
 // NIVEL 1 · CUENTAS POR COBRAR Y PAGAR
 // ══════════════════════════════════════════════════════
 export async function cargarCxCyP() {
-  const cots = await getDocs(
-    query(collection(db,"empresas",_empId,"cotizaciones"),
-      where("eliminado","!=",true), orderBy("eliminado"), orderBy("fecha","desc"))
-  );
+  // ✅ FIX: CxC usa últimos 90 días (cartera activa real), no toda la historia
+  // CxC histórica ilimitada no tiene sentido operativo — facturas viejas ya están cobradas
+  const hoy = new Date();
+  const inicio90 = new Date(hoy); inicio90.setDate(inicio90.getDate() - 90);
+  const inicio30 = new Date(hoy); inicio30.setDate(inicio30.getDate() - 30);
+
+  const [cotsSnap, gastosSnap] = await Promise.all([
+    getDocs(
+      query(
+        collection(db,"empresas",_empId,"cotizaciones"),
+        where("estado","==","Convertida"),
+        where("fecha",">=",Timestamp.fromDate(inicio90)),
+        where("eliminado","!=",true),
+        orderBy("eliminado"),
+        orderBy("fecha","desc"),
+        limit(200)
+      )
+    ),
+    getDocs(
+      query(
+        collection(db,"empresas",_empId,"gastos"),
+        where("fecha",">=",Timestamp.fromDate(inicio30)),
+        where("eliminado","==",false),
+        orderBy("fecha","desc"),
+        limit(100)
+      )
+    )
+  ]);
+
   const porCobrar = [], porPagar = [];
-  cots.forEach(d => {
+
+  cotsSnap.forEach(d => {
     const v = d.data(); if (!v.fecha) return;
     const diasVenc = v.vencimientoCxC
       ? Math.ceil((v.vencimientoCxC.toDate()-new Date())/(86400000))
       : null;
-    if (v.estado !== "Convertida") return;
     if (!v.pagada) {
       porCobrar.push({
         id:d.id, numero:v.numero, cliente:v.cliente,
@@ -322,14 +355,15 @@ export async function cargarCxCyP() {
       });
     }
   });
-  const gastos = await getDocs(
-    query(collection(db,"empresas",_empId,"gastos"),
-      where("eliminado","!=",true), orderBy("eliminado"), orderBy("fecha","desc"))
-  );
-  gastos.forEach(d => {
+
+  gastosSnap.forEach(d => {
     const g = d.data(); if (!g.fecha) return;
-    if (!g.pagado) porPagar.push({ id:d.id, proveedor:g.cliente||g.proveedor||"—", valor:g.valor, fecha:g.fecha.toDate(), categoria:g.categoria });
+    if (!g.pagado) porPagar.push({
+      id:d.id, proveedor:g.cliente||g.proveedor||"—",
+      valor:g.valor, fecha:g.fecha.toDate(), categoria:g.categoria
+    });
   });
+
   return { porCobrar, porPagar };
 }
 
@@ -337,13 +371,21 @@ export async function cargarCxCyP() {
 // NIVEL 1 · IMPUESTOS AUTOMÁTICOS
 // ══════════════════════════════════════════════════════
 export async function calcularImpuestos(mes) {
-  const snap = await getDocs(collection(db,"empresas",_empId,"libroDiario"));
   const [anio, mesN] = mes.split("-").map(Number);
+  const inicioMes = new Date(anio, mesN-1, 1);
+  const finMes    = new Date(anio, mesN, 0, 23, 59, 59);
+  // ✅ FIX: filtro por fecha en query
+  const snap = await getDocs(
+    query(
+      collection(db,"empresas",_empId,"libroDiario"),
+      where("fecha", ">=", Timestamp.fromDate(inicioMes)),
+      where("fecha", "<=", Timestamp.fromDate(finMes)),
+      orderBy("fecha","asc")
+    )
+  );
   let iva=0, retenciones=0, ica=0;
   snap.forEach(d => {
-    const doc = d.data(); if(!doc.fecha) return;
-    const f = doc.fecha.toDate();
-    if(f.getFullYear()!==anio||f.getMonth()+1!==mesN) return;
+    const doc = d.data();
     doc.lineas?.forEach(l => {
       if(l.cuenta==="2365"&&l.tipo==="credito") iva+=Number(l.valor||0);
       if(l.cuenta==="2367"&&l.tipo==="credito") retenciones+=Number(l.valor||0);
@@ -489,13 +531,21 @@ export async function calcularRentabilidadClientes() {
 // ══════════════════════════════════════════════════════
 export async function verificarPreCierre(mes) {
   const tareas = [];
-  const snap = await getDocs(collection(db,"empresas",_empId,"libroDiario"));
   const [anio, mesN] = mes.split("-").map(Number);
+  const inicioMes = new Date(anio, mesN-1, 1);
+  const finMes    = new Date(anio, mesN, 0, 23, 59, 59);
+  // ✅ FIX: filtro por fecha en query
+  const snap = await getDocs(
+    query(
+      collection(db,"empresas",_empId,"libroDiario"),
+      where("fecha", ">=", Timestamp.fromDate(inicioMes)),
+      where("fecha", "<=", Timestamp.fromDate(finMes)),
+      orderBy("fecha","asc")
+    )
+  );
   let sinClasificar=0, cuadrados=0, total=0;
   snap.forEach(d => {
-    const doc=d.data(); if(!doc.fecha) return;
-    const f=doc.fecha.toDate();
-    if(f.getFullYear()!==anio||f.getMonth()+1!==mesN) return;
+    const doc=d.data();
     total++;
     if(!doc.cuadrado) sinClasificar++;
     else cuadrados++;

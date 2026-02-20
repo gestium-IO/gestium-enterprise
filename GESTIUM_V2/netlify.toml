@@ -5,12 +5,26 @@
 [functions]
   node_bundler = "esbuild"
 
+# ── REDIRECTS ──────────────────────────────────────────────
 [[redirects]]
   from = "/"
-  to = "/landing.html"
+  to   = "/index.html"
   status = 200
 
 [[redirects]]
   from = "/app"
-  to = "/app.html"
+  to   = "/app.html"
   status = 200
+
+[[redirects]]
+  from = "/landing"
+  to   = "/landing.html"
+  status = 200
+
+# ── HEADERS DE SEGURIDAD ──────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

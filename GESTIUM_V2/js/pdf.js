@@ -175,7 +175,7 @@ export async function generarReporte(empresaData, usuarioData, logoB64, mesStr, 
     doc.setFontSize(7);
     doc.setTextColor(...GRAY);
     doc.text(
-      `${empresaData?.nombre || "Mi Empresa"} · Sistema GESTIUM · gestium.inteligencia@gmail.com`,
+      `GESTIUM · Inteligencia Operativa · gestium.inteligencia@gmail.com · WA: +57 300 554 1411`,
       pw / 2,
       doc.internal.pageSize.getHeight() - 5,
       { align: "center" }

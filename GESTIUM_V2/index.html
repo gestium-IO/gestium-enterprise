@@ -620,8 +620,6 @@ hr.sep{border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0}
       <div class="login-chip" onclick="showChipInfo('pdf')">📄 PDF automático</div>
       <div class="login-chip" onclick="showChipInfo('multiuser')">☁️ Multi-usuario</div>
       <div class="login-chip" onclick="showChipInfo('firebase')">🔒 Firebase seguro</div>
-      <div class="login-chip" onclick="showChipInfo('contabilidad')">📚 Contabilidad</div>
-      <div class="login-chip" onclick="showChipInfo('ocr')">🔍 OCR IA</div>
     </div>
     <div class="login-contact">
       <a href="https://wa.me/573005541411?text=Hola, quiero información sobre GESTIUM" target="_blank" class="contact-btn whats">
@@ -729,8 +727,18 @@ hr.sep{border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0}
       <div class="sb-brand">Gestium IO</div>
       <div class="sb-company" id="sidebarEmpresaNombre">—</div>
     </div>
-    <nav class="sb-nav" id="sbNav">
-      <!-- Construido dinámicamente según plan por construirSidebar() -->
+    <nav class="sb-nav">
+      <div class="sb-section">Principal</div>
+      <button class="sb-item" data-modulo="dashboard">
+        <span class="sb-dot"></span>Dashboard
+      </button>
+      <button class="sb-item" data-modulo="cotizaciones">
+        <span class="sb-dot"></span>Cotizaciones
+      </button>
+      <div class="sb-section">Gestión</div>
+      <button class="sb-item" data-modulo="financiero">
+        <span class="sb-dot"></span>Finanzas
+      </button>
     </nav>
     <div class="sb-footer">
       <!-- Contacto Sidebar -->
@@ -926,85 +934,45 @@ const chipData = {
   dashboard: {
     icon: '📊',
     title: 'Dashboard en Vivo',
-    badge: 'TODOS LOS PLANES',
-    desc: 'Visualiza el estado real de tu negocio en tiempo real. Un solo vistazo te da toda la información que necesitas para tomar decisiones.',
+    desc: 'Monitorea tus ventas y cotizaciones en tiempo real con gráficos interactivos.',
     items: [
-      'KPIs automáticos: ventas del mes, cotizaciones activas, ticket promedio y tasa de conversión',
-      'Gráfico de ventas por día con línea de tendencia',
-      'Tabla de clientes más frecuentes y su facturación',
-      'Filtro por mes y por cliente con un clic',
-      'Reporte PDF mensual descargable desde el mismo dashboard',
-      'Alertas visuales cuando el flujo de caja baja o hay cartera vencida'
+      'Visualización de KPIs clave (ventas, conversión, tickets)',
+      'Gráficos de ventas por día, cliente y estado',
+      'Filtros avanzados por mes y cliente',
+      'Actualización instantánea de datos'
     ]
   },
   pdf: {
     icon: '📄',
-    title: 'PDF Profesional Automático',
-    badge: 'TODOS LOS PLANES',
-    desc: 'Genera cotizaciones y reportes con tu marca en segundos. Sin Word, sin Excel, sin diseñadores.',
+    title: 'PDF Automático',
+    desc: 'Genera cotizaciones y reportes profesionales con un solo clic.',
     items: [
-      'Cotizaciones con logo de tu empresa, NIT, ciudad y datos de contacto',
-      'Cálculo automático de m², m³, subtotal, IVA 19% y total',
-      'Número de cotización único y consecutivo por empresa',
-      'Estado de cotización: Pendiente → En espera → Convertida → Cancelada',
-      'Reporte mensual de ventas con resumen financiero en PDF',
-      'Descarga instantánea — el cliente recibe su cotización al instante'
+      'Cotizaciones con tu logo y datos de empresa',
+      'Cálculo automático de m³, subtotales e IVA',
+      'Reportes mensuales de ventas',
+      'Marca de agua GESTIUM en cada documento'
     ]
   },
   multiuser: {
     icon: '☁️',
-    title: 'Multi-usuario y Multi-empresa',
-    badge: 'PREMIUM · SUPER PREMIUM',
-    desc: 'Tu empresa en la nube. Todo tu equipo conectado, cada uno con su rol y permisos definidos.',
+    title: 'Multi-usuario',
+    desc: 'Colabora con tu equipo desde cualquier dispositivo, en cualquier lugar.',
     items: [
-      'Usuarios ilimitados por empresa con rol: Admin, Vendedor o Contador',
-      'Invitaciones por link con token temporal de 48 horas',
-      'Admins pueden activar, desactivar y controlar permisos de su equipo',
-      'Múltiples empresas completamente aisladas — una no ve los datos de la otra',
-      'Sincronización en tiempo real: lo que registra un vendedor lo ve el admin al instante',
-      'Funciona en PC, tablet y móvil sin instalar nada'
+      'Acceso simultáneo para múltiples usuarios',
+      'Sincronización automática en la nube',
+      'Roles y permisos configurables',
+      'Compatible con móvil, tablet y PC'
     ]
   },
   firebase: {
     icon: '🔒',
-    title: 'Seguridad Enterprise Google',
-    badge: 'INFRAESTRUCTURA GOOGLE',
-    desc: 'Tus datos protegidos con la misma infraestructura que usa Google para sus propios servicios.',
+    title: 'Firebase Seguro',
+    desc: 'Tu información protegida con la infraestructura de Google.',
     items: [
-      'Autenticación con email + contraseña encriptada (Firebase Auth)',
-      'Reglas Firestore: ningún usuario puede ver datos de otra empresa',
-      'Backup automático en servidores de Google — datos nunca se pierden',
-      'Recuperación de contraseña por correo en 30 segundos',
-      'Logs de auditoría: cada acción queda registrada con usuario, fecha y hora',
-      'Soft delete: nada se elimina físicamente — todo se puede recuperar'
-    ]
-  },
-  contabilidad: {
-    icon: '📚',
-    title: 'Contabilidad Automatizada',
-    badge: 'SUPER PREMIUM',
-    desc: 'Libro diario real, estados financieros y cierre contable. Como Siigo, pero sin DIAN y sin costos de nómina contable.',
-    items: [
-      'Libro diario con doble partida validada automáticamente',
-      'Asientos contables automáticos al confirmar cada venta',
-      'Plan de cuentas PUC colombiano integrado',
-      'Estado de resultados: Ingresos - Gastos = Utilidad neta',
-      'Balance general: Activos = Pasivos + Patrimonio',
-      'Cierre mensual con bloqueo de edición de periodos anteriores'
-    ]
-  },
-  ocr: {
-    icon: '🔍',
-    title: 'OCR con Google Vision',
-    badge: 'SUPER PREMIUM',
-    desc: 'Fotografía una orden de pedido manuscrita y el sistema extrae las medidas automáticamente para cotizar.',
-    items: [
-      'Sube una foto desde celular o PC — JPG, PNG, WEBP hasta 4MB',
-      'Google Cloud Vision lee el texto con precisión de 95%+',
-      'Medidas detectadas se pasan automáticamente al cotizador',
-      'Reduce errores de digitación de medidas en campo',
-      'Ideal para marqueterías, carpinterías y vidriería',
-      'Procesado en menos de 3 segundos por imagen'
+      'Autenticación segura con encriptación',
+      'Backup automático en la nube',
+      'Protección contra accesos no autorizados',
+      'Recuperación de contraseña por email'
     ]
   }
 };
@@ -1015,17 +983,6 @@ function showChipInfo(type) {
   document.getElementById('modalIcon').textContent = data.icon;
   document.getElementById('modalTitle').textContent = data.title;
   document.getElementById('modalDesc').textContent = data.desc;
-  // Badge de plan
-  let badge = document.getElementById('modalBadge');
-  if (!badge) {
-    badge = document.createElement('div');
-    badge.id = 'modalBadge';
-    badge.style.cssText = 'display:inline-block;background:rgba(6,214,200,.12);color:var(--teal);font-size:10px;font-weight:800;letter-spacing:1px;padding:4px 10px;border-radius:20px;margin-bottom:14px;border:1px solid rgba(6,214,200,.25)';
-    const titleEl = document.getElementById('modalTitle');
-    titleEl.parentNode.insertBefore(badge, titleEl.nextSibling);
-  }
-  badge.textContent = data.badge || '';
-  badge.style.display = data.badge ? 'inline-block' : 'none';
   const list = document.getElementById('modalList');
   list.innerHTML = '';
   data.items.forEach(item => {
@@ -1046,76 +1003,6 @@ document.getElementById('chipModal').addEventListener('click', (e) => {
 });
 </script>
 
-    <!-- ── MÓDULO CONTABILIDAD ── -->
-    <div id="moduloContabilidad" class="page" style="display:none">
-      <div class="sec-title">Contabilidad <span class="sec-title-tag">SUPER PREMIUM</span></div>
-      <div style="padding:40px 0;text-align:center;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:16px">📚</div>
-        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Módulo Contabilidad</h3>
-        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
-          Libro diario, estados financieros y cierre contable.<br>
-          Disponible en el panel completo (<strong>app.html</strong>).
-        </p>
-      </div>
-    </div>
-
-    <!-- ── MÓDULO USUARIOS ── -->
-    <div id="moduloUsuarios" class="page" style="display:none">
-      <div class="sec-title">Usuarios</div>
-      <div style="padding:40px 0;text-align:center;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:16px">👥</div>
-        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Gestión de Usuarios</h3>
-        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
-          Administra los miembros de tu empresa, sus roles y permisos.
-        </p>
-      </div>
-    </div>
-
-    <!-- ── MÓDULO INVITACIONES ── -->
-    <div id="moduloInvitaciones" class="page" style="display:none">
-      <div class="sec-title">Invitaciones</div>
-      <div style="padding:40px 0;text-align:center;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:16px">🔗</div>
-        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Invitar Usuarios</h3>
-        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
-          Genera links de invitación con tiempo de expiración para que nuevos usuarios se unan a tu empresa.
-        </p>
-      </div>
-    </div>
-
-    <!-- ── MÓDULO LOGS ── -->
-    <div id="moduloLogs" class="page" style="display:none">
-      <div class="sec-title">Auditoría</div>
-      <div style="padding:40px 0;text-align:center;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:16px">📝</div>
-        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">Registro de Auditoría</h3>
-        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
-          Todas las acciones del sistema quedan registradas: quién, qué y cuándo.
-        </p>
-      </div>
-    </div>
-
-    <!-- ── MÓDULO OCR ── -->
-    <div id="moduloOCR" class="page" style="display:none">
-      <div class="sec-title">OCR Medidas <span class="sec-title-tag">SUPER PREMIUM</span></div>
-      <div style="padding:40px 0;text-align:center;color:var(--text2)">
-        <div style="font-size:48px;margin-bottom:16px">🔍</div>
-        <h3 style="font-size:18px;font-weight:800;color:var(--white);margin-bottom:8px">OCR con Google Vision</h3>
-        <p style="color:var(--text3);font-size:13px;line-height:1.7;max-width:400px;margin:0 auto">
-          Fotografía una orden de pedido y el sistema extrae las medidas automáticamente para cotizar.
-        </p>
-      </div>
-    </div>
-
-    <!-- ── MÓDULO SUPERADMIN ── -->
-    <div id="moduloSuperadmin" class="page" style="display:none">
-      <div class="sec-title">⚙ Superadmin</div>
-      <div id="superadminContent" style="padding:20px 0">
-        <p style="color:var(--text3);font-size:13px">Cargando panel de control...</p>
-      </div>
-    </div>
-
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import {
@@ -1130,12 +1017,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey:            "AIzaSyBJrHrwbp_udn-KuBAS75_dbOH4xsQW_KI",
-  authDomain:        "gestium-76570.firebaseapp.com",
-  projectId:         "gestium-76570",
-  storageBucket:     "gestium-76570.firebasestorage.app",
-  messagingSenderId: "720694044667",
-  appId:             "1:720694044667:web:b864af5adb53e473690d5e"
+  apiKey:            "AIzaSyBF246-DxbLTyH-zXHlrSh92_Tq2JD7cfE",
+  authDomain:        "gestium-2d40b.firebaseapp.com",
+  projectId:         "gestium-2d40b",
+  storageBucket:     "gestium-2d40b.firebasestorage.app",
+  messagingSenderId: "949260689854",
+  appId:             "1:949260689854:web:0b69f4e7d8ed0e9ac759ef"
 };
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1172,7 +1059,7 @@ function addPdfWatermark(docPdf) {
   docPdf.setFontSize(7);
   docPdf.setTextColor(150,150,150);
   docPdf.setFont("helvetica","normal");
-  docPdf.text((empresaData?.nombre||"Mi Empresa") + " · GESTIUM · gestium.inteligencia@gmail.com · WA: +57 300 554 1411", pw/2, ph - 10, { align:"center" });
+  docPdf.text("GESTIUM · Inteligencia Operativa · WA: +57 300 554 1411 · gestium.inteligencia@gmail.com", pw/2, ph - 10, { align:"center" });
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -1231,13 +1118,38 @@ window.addEventListener('DOMContentLoaded', () => {
       if(modo==="nueva"){
         const empRef=doc(collection(db,"empresas")); empId=empRef.id;
         const trial=new Date(); trial.setDate(trial.getDate()+7);
-        await setDoc(empRef,{nombre:nomEmp,nit:nitEmp||"",telefono:telEmp||"",direccion:dirEmp||"",ciudad:ciudadEmp||"",pais:paisEmp||"Colombia",web:webEmp||"",email:emailEmp||email,plan:"trial",contador:0,vencimiento:Timestamp.fromDate(trial),logo:null,activa:true});
+        await setDoc(empRef,{nombre:nomEmp, nit:nitEmp||"", telefono:telEmp||"",
+          direccion:dirEmp||"", ciudad:ciudadEmp||"", pais:paisEmp||"Colombia",
+          web:webEmp||"", email:emailEmp||email,
+          plan:"trial", contador:0,
+          activa:true,
+          fechaVencimiento:Timestamp.fromDate(trial),
+          vencimiento:Timestamp.fromDate(trial),
+          logo:null,
+          creadaEn:Timestamp.fromDate(new Date()),
+          onboardingCompletado:false
+        });
       } else {
         empId=idExistente;
         const s=await getDoc(doc(db,"empresas",empId));
         if(!s.exists()){ msg.textContent="Empresa no encontrada"; return; }
       }
-      await setDoc(doc(db,"Usuarios",user.uid),{email:user.email,nombre:nomUser,apellido:apUser||"",cargo:cargoUser||"",celular:celUser,telefono:telUser||"",empresaId:empId,rol:"admin",activo:true});
+      // ✅ Arquitectura multiempresa correcta
+      // 1. Usuario en subcolección de empresa
+      await setDoc(doc(db,"empresas",empId,"usuarios",user.uid),{
+        email:user.email, nombre:nomUser, apellido:apUser||"", cargo:cargoUser||"",
+        celular:celUser, telefono:telUser||"", rol:"admin", activo:true,
+        superadmin:false, creadoEn:Timestamp.fromDate(new Date())
+      });
+      // 2. Meta ligero para lookup rápido en login
+      await setDoc(doc(db,"usuariosMeta",user.uid),{
+        empresaId:empId, email:user.email, creadoEn:Timestamp.fromDate(new Date())
+      });
+      // 3. Inicializar contador OCR mensual (mes actual = 0)
+      const mesKey = new Date().toISOString().slice(0,7);
+      await setDoc(doc(db,"empresas",empId,"ocrUsage",mesKey),{
+        count:0, mes:mesKey, empresaId:empId
+      },{merge:true});
       alert("¡Cuenta creada! Inicia sesión.");
       registerScreen.style.display="none"; loginScreen.style.display="flex";
     } catch(e){ msg.textContent=e.message||"Error creando cuenta"; }
@@ -1274,100 +1186,97 @@ window.addEventListener('DOMContentLoaded', () => {
     catch(err){ $("loginMessage").textContent=err.message; }
   });
 
-  /* ── AUTH STATE — ARQUITECTURA MULTIEMPRESA ── */
-  onAuthStateChanged(auth, async(user)=>{
-    try {
-      if(!user){ loginScreen.style.display="flex"; appDiv.style.display="none"; setLL(false); return; }
+  /* ── AUTH STATE ── */
+ onAuthStateChanged(auth, async(user)=>{
+  try {
 
-      // 1. Leer empresaId desde usuariosMeta (índice ligero)
-      let eId = localStorage.getItem("gestium_emp_"+user.uid);
-      let uData = null;
-
-      if(eId){
-        const uSnap = await getDoc(doc(db,"empresas",eId,"usuarios",user.uid));
-        if(uSnap.exists()) uData = uSnap.data();
-      }
-
-      if(!uData){
-        const metaSnap = await getDoc(doc(db,"usuariosMeta",user.uid));
-        if(metaSnap.exists()){
-          eId = metaSnap.data().empresaId;
-          localStorage.setItem("gestium_emp_"+user.uid, eId);
-          const uSnap2 = await getDoc(doc(db,"empresas",eId,"usuarios",user.uid));
-          if(uSnap2.exists()) uData = uSnap2.data();
-        }
-      }
-
-      // Fallback: colección global Usuarios (legado)
-      if(!uData){
-        const uSnapLeg = await getDoc(doc(db,"Usuarios",user.uid));
-        if(uSnapLeg.exists()){
-          uData = uSnapLeg.data();
-          eId = uData.empresaId || eId;
-        }
-      }
-
-      if(!uData || !eId){ alert("Usuario no configurado. Contacta al soporte."); await signOut(auth); return; }
-      if(!uData.activo){ alert("Usuario desactivado."); await signOut(auth); return; }
-
-      usuarioData = uData;
-      empresaId   = eId;
-      localStorage.setItem("gestium_emp_"+user.uid, empresaId);
-
-      const eSnap = await getDoc(doc(db,"empresas",empresaId));
-      if(!eSnap.exists()){ alert("Empresa no encontrada."); await signOut(auth); return; }
-      empresaData = eSnap.data()||{};
-
-      // Vencimiento — no aplica a superadmin
-      if(!usuarioData.superadmin){
-        const venc = empresaData.fechaVencimiento || empresaData.vencimiento;
-        if(venc && new Date() > venc.toDate()){ alert("Plan vencido. Contacta a soporte."); await signOut(auth); return; }
-      }
-
-      // Detectar plan efectivo
-      const planEfectivo = usuarioData.superadmin ? "superadmin" : (empresaData.plan || "trial");
-
-      // Actualizar UI
-      const nomEmp = empresaData.nombre||"Mi Empresa";
-      $("sidebarEmpresaNombre").textContent = nomEmp;
-      $("topbarTitle").textContent = nomEmp;
-      const nombre = [usuarioData.nombre,usuarioData.apellido].filter(Boolean).join(" ")||"Usuario";
-      $("sidebarUserName").textContent  = nombre;
-      $("sidebarUserEmail").textContent = user.email||"";
-      $("userAvatar").textContent = (usuarioData.nombre||"?")[0].toUpperCase();
-
-      // Badge de plan en topbar
-      const badge = document.querySelector(".topbar-badge");
-      if(badge){
-        const nombres = {trial:"Trial",basico:"Básico",premium:"Premium",superpremium:"SuperPremium",superadmin:"⚙ Superadmin"};
-        badge.textContent = nombres[planEfectivo] || planEfectivo;
-        badge.style.background = planEfectivo==="superadmin" ? "rgba(249,115,22,.2)" : "";
-        badge.style.color      = planEfectivo==="superadmin" ? "#f97316" : "";
-      }
-
-      logoB64 = empresaData.logoUrl || empresaData.logo || null;
-      if(logoB64){ $("logoPreview").src=logoB64; $("logoPreview").style.display="block"; }
-
-      // ── CONSTRUIR SIDEBAR DINÁMICO SEGÚN PLAN ──
-      construirSidebar(planEfectivo, usuarioData.superadmin);
-
-      await cargarClientes();
-      loginScreen.style.display="none"; appDiv.style.display="block";
-      mostrarModulo("cotizaciones"); setLL(false);
-
-    } catch(err){
-      setLL(false);
-      console.error("[auth]", err);
-      alert("Error al iniciar sesión: "+(err.message||err));
-      try{await signOut(auth);}catch(e){}
+    if(!user){
+      loginScreen.style.display="flex";
+      appDiv.style.display="none";
+      return;
     }
-  });
 
-  $("sidebarLogout").addEventListener("click", async()=>{
+    // 1️⃣ Buscar meta para saber a qué empresa pertenece
+    const metaSnap = await getDoc(doc(db,"usuariosMeta", user.uid));
+
+    if(!metaSnap.exists()){
+      alert("Usuario sin empresa asignada.");
+      await signOut(auth);
+      return;
+    }
+
+    empresaId = metaSnap.data().empresaId;
+
+    // 2️⃣ Buscar usuario dentro de su empresa
+    const userSnap = await getDoc(
+      doc(db,"empresas",empresaId,"usuarios",user.uid)
+    );
+
+    if(!userSnap.exists()){
+      alert("Usuario no configurado correctamente.");
+      await signOut(auth);
+      return;
+    }
+
+    usuarioData = userSnap.data();
+
+    if(!usuarioData.activo){
+      alert("Usuario desactivado.");
+      await signOut(auth);
+      return;
+    }
+
+    // 3️⃣ Cargar empresa
+    const empresaSnap = await getDoc(doc(db,"empresas",empresaId));
+
+    if(!empresaSnap.exists()){
+      alert("Empresa no encontrada.");
+      await signOut(auth);
+      return;
+    }
+
+    empresaData = empresaSnap.data();
+
+    if(empresaData.vencimiento &&
+       new Date() > empresaData.vencimiento.toDate()){
+      alert("Plan vencido.");
+      await signOut(auth);
+      return;
+    }
+
+    // 4️⃣ Render UI
+    $("sidebarEmpresaNombre").textContent = empresaData.nombre || "Mi Empresa";
+    $("topbarTitle").textContent = empresaData.nombre || "Mi Empresa";
+
+    const nombre = [usuarioData.nombre, usuarioData.apellido]
+      .filter(Boolean).join(" ");
+
+    $("sidebarUserName").textContent = nombre;
+    $("sidebarUserEmail").textContent = user.email;
+
+    $("userAvatar").textContent =
+      (usuarioData.nombre || "?")[0].toUpperCase();
+
+    logoB64 = empresaData.logo || null;
+
+    if(logoB64){
+      $("logoPreview").src = logoB64;
+      $("logoPreview").style.display = "block";
+    }
+
+    await cargarClientes();
+
+    loginScreen.style.display="none";
+    appDiv.style.display="block";
+
+    mostrarModulo("cotizaciones");
+
+  } catch(err){
+    alert("Error cargando sesión: " + err.message);
     await signOut(auth);
-    empresaId=null; empresaData=null; usuarioData=null; logoB64=null;
-    [chartV,chartC,chartE].forEach(c=>{if(c)c.destroy();}); chartV=chartC=chartE=null;
-  });
+  }
+});
+
 
   /* ── MOBILE ── */
   const sidebar=$("sidebar"), overlay=$("overlay");
@@ -1375,91 +1284,19 @@ window.addEventListener('DOMContentLoaded', () => {
   overlay.addEventListener("click",()=>{ sidebar.classList.remove("open"); overlay.classList.remove("on"); });
 
   /* ── NAVEGACIÓN ── */
-  // Definición de todos los módulos disponibles
-  const TODOS_MODULOS = ["moduloCotizaciones","moduloDashboard","moduloFinanciero",
-    "moduloContabilidad","moduloUsuarios","moduloLogs","moduloInvitaciones",
-    "moduloOCR","moduloSuperadmin"];
-
   window.mostrarModulo = function(n){
-    TODOS_MODULOS.forEach(id=>{ const el=$(id); if(el) el.style.display="none"; });
-    const mapa = {
-      cotizaciones: ()=>{ $("moduloCotizaciones").style.display="block"; },
-      dashboard:    ()=>{ $("moduloDashboard").style.display="block"; actualizarDashboard(); },
-      financiero:   ()=>{ $("moduloFinanciero").style.display="block"; cargarCostos(); actualizarKPIs(); cargarCotizacionesMes(); },
-      contabilidad: ()=>{ const m=$("moduloContabilidad"); if(m) m.style.display="block"; },
-      usuarios:     ()=>{ const m=$("moduloUsuarios"); if(m) m.style.display="block"; cargarUsuarios(); },
-      logs:         ()=>{ const m=$("moduloLogs"); if(m) m.style.display="block"; cargarLogs(); },
-      invitaciones: ()=>{ const m=$("moduloInvitaciones"); if(m) m.style.display="block"; cargarInvitaciones(); },
-      ocr:          ()=>{ const m=$("moduloOCR"); if(m) m.style.display="block"; },
-      superadmin:   ()=>{ const m=$("moduloSuperadmin"); if(m) m.style.display="block"; cargarSuperadmin(); },
-    };
-    if(mapa[n]) mapa[n]();
-    document.querySelectorAll(".sb-item").forEach(x=>x.classList.remove("active"));
-    document.querySelectorAll(`.sb-item[data-modulo="${n}"]`).forEach(x=>x.classList.add("active"));
-    if(sidebar) sidebar.classList.remove("open");
-    if(overlay) overlay.classList.remove("on");
+    ["moduloCotizaciones","moduloDashboard","moduloFinanciero"].forEach(id=>$(id).style.display="none");
+    if(n==="cotizaciones") $("moduloCotizaciones").style.display="block";
+    if(n==="dashboard")    { $("moduloDashboard").style.display="block"; actualizarDashboard(); }
+    if(n==="financiero")   { $("moduloFinanciero").style.display="block"; cargarCostos(); actualizarKPIs(); cargarCotizacionesMes(); }
   };
-
-  // Stubs para módulos aún no implementados en index.html
-  function cargarUsuarios(){ const m=$("moduloUsuarios"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">👥</div><h3>Gestión de Usuarios</h3><p style="color:var(--text3);margin-top:8px">Módulo disponible en el panel completo.</p></div>'; }
-  function cargarLogs(){ const m=$("moduloLogs"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">📝</div><h3>Auditoría</h3><p style="color:var(--text3);margin-top:8px">Registro de todas las acciones del sistema.</p></div>'; }
-  function cargarInvitaciones(){ const m=$("moduloInvitaciones"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">🔗</div><h3>Invitaciones</h3><p style="color:var(--text3);margin-top:8px">Invita usuarios a tu empresa por link.</p></div>'; }
-  function cargarSuperadmin(){ const m=$("moduloSuperadmin"); if(m&&!m.dataset.init) m.innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">⚙️</div><h3>Superadmin</h3><p style="color:var(--text3);margin-top:8px">Panel de control del sistema GESTIUM.</p></div>'; }
-
-  // Construir sidebar dinámicamente según plan
-  window.construirSidebar = function(plan, esSuperAdmin){
-    const FEATURES = {
-      trial:        ["cotizaciones","dashboard"],
-      basico:       ["cotizaciones","dashboard"],
-      premium:      ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones"],
-      superpremium: ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones","contabilidad","ocr"],
-      superadmin:   ["cotizaciones","dashboard","financiero","logs","usuarios","invitaciones","contabilidad","ocr","superadmin"],
-    };
-    const items = [
-      { key:"cotizaciones", icon:"📋", label:"Cotizaciones",  section:"PRINCIPAL" },
-      { key:"dashboard",    icon:"📊", label:"Dashboard",     section:null },
-      { key:"financiero",   icon:"💰", label:"Finanzas",      section:"GESTIÓN" },
-      { key:"contabilidad", icon:"📚", label:"Contabilidad",  section:null },
-      { key:"usuarios",     icon:"👥", label:"Usuarios",      section:"EQUIPO" },
-      { key:"invitaciones", icon:"🔗", label:"Invitaciones",  section:null },
-      { key:"logs",         icon:"📝", label:"Auditoría",     section:"SISTEMA" },
-      { key:"ocr",          icon:"🔍", label:"OCR Medidas",   section:null },
-      { key:"superadmin",   icon:"⚙️",  label:"Superadmin",   section:null },
-    ];
-    const features = FEATURES[plan] || FEATURES.trial;
-    const nav = $("sbNav");
-    if(!nav) return;
-    nav.innerHTML = "";
-    let lastSection = "";
-    items.forEach(item=>{
-      if(item.key==="superadmin" && !esSuperAdmin) return;
-      if(item.section && item.section !== lastSection){
-        const sec = document.createElement("div");
-        sec.className = "sb-section";
-        sec.textContent = item.section;
-        nav.appendChild(sec);
-        lastSection = item.section;
-      }
-      const tiene = features.includes(item.key);
-      const btn = document.createElement("button");
-      btn.className = "sb-item" + (tiene ? "" : " locked");
-      btn.dataset.modulo = item.key;
-      btn.innerHTML = `<span style="font-size:15px;flex-shrink:0">${item.icon}</span><span style="flex:1">${item.label}</span>${tiene ? '<span class="sb-dot"></span>' : '<span style="font-size:9px;color:#f59e0b;font-weight:700">🔒</span>'}`;
-      btn.addEventListener("click", ()=>{
-        if(!tiene){ _toast('"'+item.label+'" requiere plan superior',"warn"); return; }
-        mostrarModulo(item.key);
-      });
-      nav.appendChild(btn);
+  document.querySelectorAll(".sb-item[data-modulo]").forEach(b=>{
+    b.addEventListener("click",()=>{
+      document.querySelectorAll(".sb-item").forEach(x=>x.classList.remove("active"));
+      b.classList.add("active"); mostrarModulo(b.dataset.modulo);
+      sidebar.classList.remove("open"); overlay.classList.remove("on");
     });
-  };
-
-  function _toast(msg, tipo="info"){
-    let el=document.getElementById("toastG");
-    if(!el){ el=document.createElement("div"); el.id="toastG"; el.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;pointer-events:none;transition:opacity .25s;"; document.body.appendChild(el); }
-    const c={success:["#06d6c8","#070d1a"],error:["#ef4444","#fff"],warn:["#f59e0b","#070d1a"],info:["#3b82f6","#fff"]}[tipo]||["#3b82f6","#fff"];
-    el.style.background=c[0]; el.style.color=c[1]; el.textContent=msg; el.style.opacity="1";
-    clearTimeout(el._t); el._t=setTimeout(()=>{ el.style.opacity="0"; },3000);
-  }
+  });
 
   /* ── CLIENTES ── */
   async function cargarClientes(){
@@ -1713,7 +1550,17 @@ window.addEventListener('DOMContentLoaded', () => {
     if(!mesI.value){ const h=new Date(); mesI.value=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,"0")}`; }
     const anio=Number(mesI.value.substring(0,4)), mes=Number(mesI.value.substring(5,7))-1;
 
-    const snap=await getDocs(collection(db,"empresas",empresaId,"cotizaciones"));
+      const inicioMes = new Date(anio, mes, 1);
+      const finMes = new Date(anio, mes + 1, 1);
+
+      const snap = await getDocs(
+        query(
+          collection(db,"empresas",empresaId,"cotizaciones"),
+          where("fecha", ">=", Timestamp.fromDate(inicioMes)),
+          where("fecha", "<", Timestamp.fromDate(finMes))
+        )
+      );
+
     const docs=[]; snap.forEach(d=>docs.push({id:d.id,...d.data()}));
 
     cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cantTotal=0;

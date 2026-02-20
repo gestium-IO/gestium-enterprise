@@ -1,49 +1,62 @@
 rules_version = '2';
 // ═══════════════════════════════════════════════════════════════════
-//  GESTIUM · Reglas Firestore Producción
-//  SaaS Robusto 5 Años · Multiempresa · Control de Planes
-//
-//  🔴 COPIAR EXACTAMENTE ESTAS REGLAS EN FIREBASE CONSOLE
-//  Firebase Console → Firestore Database → Rules → Publicar
-//
-//  Precios: Básico $65k · Premium $119k · SuperPremium $229k COP/mes
+//  GESTIUM · Firestore Rules v3.0 — Production Hardened
+//  Cambios vs v2.0:
+//  + getEmpresa() con null-safe (empresaExiste check)
+//  + ocrUsage: validación de incremento exacto count+1 (anti-tamper)
+//  + usuariosMeta: empresaId inmutable en update
+//  + usuarios/create: rol "admin" solo lo puede asignar otro admin
+//  + empresas/create: bloqueado si el usuario YA tiene meta (evita duplicar empresa)
 // ═══════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* ══════════════════════════════════════════════════════════════
-       FUNCIONES BASE - ARQUITECTURA MULTIEMPRESA
-    ══════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════ */
+    /*  UTILIDADES BASE                               */
+    /* ═══════════════════════════════════════════════ */
 
     function isAuth() {
       return request.auth != null;
     }
 
-    function empresaDoc(empresaId) {
-      return /databases/$(database)/documents/empresas/$(empresaId);
-    }
-
-    function userDoc(empresaId) {
-      return /databases/$(database)/documents/empresas/$(empresaId)/usuarios/$(request.auth.uid);
+    function usuarioMetaExiste() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/usuariosMeta/$(request.auth.uid));
     }
 
     function perteneceAEmpresa(empresaId) {
-      return isAuth() && exists(userDoc(empresaId));
+      return usuarioMetaExiste()
+        && get(/databases/$(database)/documents/usuariosMeta/$(request.auth.uid)).data.empresaId == empresaId;
+    }
+
+    function empresaExiste(empresaId) {
+      return exists(/databases/$(database)/documents/empresas/$(empresaId));
     }
 
     function getEmpresa(empresaId) {
-      return get(empresaDoc(empresaId)).data;
+      return empresaExiste(empresaId)
+        ? get(/databases/$(database)/documents/empresas/$(empresaId)).data
+        : null;
     }
 
-    // 🔴 CRÍTICO: Empresa activa + no vencida
     function empresaActiva(empresaId) {
-      return getEmpresa(empresaId).activa == true
-        && getEmpresa(empresaId).fechaVencimiento > request.time;
+      let emp = getEmpresa(empresaId);
+      return emp != null
+        && (
+             (('activa' in emp) && emp.activa == true)
+             || (('activo' in emp) && emp.activo == true)
+           )
+        && (
+             !('fechaVencimiento' in emp)
+             || emp.fechaVencimiento > request.time
+           );
     }
 
     function getRol(empresaId) {
-      return get(userDoc(empresaId)).data.rol;
+      return exists(/databases/$(database)/documents/empresas/$(empresaId)/usuarios/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/empresas/$(empresaId)/usuarios/$(request.auth.uid)).data.rol
+        : null;
     }
 
     function esAdmin(empresaId) {
@@ -51,13 +64,18 @@ service cloud.firestore {
         && getRol(empresaId) == "admin";
     }
 
-    function esContabilidad(empresaId) {
-      return perteneceAEmpresa(empresaId)
-        && (getRol(empresaId) == "admin" || getRol(empresaId) == "contabilidad");
+    function esSuperAdmin() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/superadmin/$(request.auth.uid));
     }
 
     function getPlan(empresaId) {
-      return getEmpresa(empresaId).plan;
+      let emp = getEmpresa(empresaId);
+      return emp != null ? emp.plan : null;
+    }
+
+    function tieneOCR(empresaId) {
+      return getPlan(empresaId) in ["premium","superpremium"];
     }
 
     function tieneFinanciero(empresaId) {
@@ -68,300 +86,349 @@ service cloud.firestore {
       return getPlan(empresaId) == "superpremium";
     }
 
-    function esSuperAdmin() {
-      return isAuth() &&
-        exists(/databases/$(database)/documents/superadmin/$(request.auth.uid));
-    }
-
-    /* ══════════════════════════════════════════════════════════════
-       EMPRESAS - Nunca se pueden eliminar
-    ══════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════ */
+    /*  EMPRESAS                                      */
+    /* ═══════════════════════════════════════════════ */
 
     match /empresas/{empresaId} {
 
-      // Leer: solo miembros de la empresa
-      allow read: if perteneceAEmpresa(empresaId);
+      allow read:
+        if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-      // Crear: solo durante registro (primera vez)
-      // Validar estructura mínima obligatoria
-      allow create: if isAuth() &&
-        request.resource.data.keys().hasAll(['nombre', 'plan', 'activa', 'fechaVencimiento', 'contador']) &&
-        request.resource.data.plan in ['trial', 'basico', 'premium', 'superpremium'] &&
-        request.resource.data.activa == true;
+      // Solo se puede crear empresa si el usuario NO tiene ya una empresa asignada
+      // Esto evita que alguien cree múltiples empresas con la misma cuenta
+      allow create:
+        if isAuth()
+        && !usuarioMetaExiste()
+        && request.resource.data.keys().hasAll(['nombre','plan','activa','contador'])
+        && request.resource.data.plan in ['trial','basico','premium','superpremium'];
 
-      // Actualizar: solo admin (NO puede cambiar plan desde frontend)
-      allow update: if esAdmin(empresaId) &&
-        // 🔴 CRÍTICO: Plan NO se puede cambiar desde frontend
-        request.resource.data.plan == resource.data.plan;
+      allow update:
+        if esSuperAdmin()
+        || (
+            esAdmin(empresaId)
+            && request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasOnly(['nombre','telefono','direccion','web','logo'])
+          );
 
-      // 🔴 CRÍTICO: Nunca eliminar empresas (soft delete con activa:false)
+
       allow delete: if false;
 
-      /* ══════════════════════════════════════════════════════════════
-         USUARIOS (subcolección por empresa)
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  USUARIOS                   */
+      /* ─────────────────────────── */
 
       match /usuarios/{uid} {
 
-        allow read: if perteneceAEmpresa(empresaId);
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        // Crear: admin o durante registro (primera vez)
-        allow create: if (esAdmin(empresaId) || request.auth.uid == uid) &&
-          request.resource.data.keys().hasAll(['email', 'nombre', 'rol', 'activo']) &&
-          request.resource.data.rol in ['admin', 'vendedor', 'contabilidad'];
+        allow create:
+          if (esAdmin(empresaId) || esSuperAdmin())
+          && request.resource.data.keys().hasAll(['email','nombre','rol','activo'])
+          && request.resource.data.rol in ['admin','vendedor','contabilidad']
+          && (
+              request.resource.data.rol != "admin"
+              || esAdmin(empresaId)
+              || esSuperAdmin()
+            );
 
-        // Actualizar: solo admin
-        allow update: if esAdmin(empresaId);
 
-        // 🔴 CRÍTICO: Nunca eliminar usuarios (soft delete con activo:false)
-        allow delete: if false;
+        allow update:
+        if (esAdmin(empresaId) || esSuperAdmin())
+        && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['nombre','activo','rol'])
+        && (
+            request.resource.data.rol != "admin"
+            || esAdmin(empresaId)
+            || esSuperAdmin()
+          )
+          && (
+                request.auth.uid != uid
+                || request.resource.data.activo == true
+              )
+      ;
+
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         CLIENTES
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  CLIENTES                   */
+      /* ─────────────────────────── */
 
       match /clientes/{clienteId} {
 
-        allow read: if perteneceAEmpresa(empresaId);
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        allow create: if perteneceAEmpresa(empresaId) &&
-          empresaActiva(empresaId) &&
-          request.resource.data.keys().hasAll(['nombre', 'nombreNormalizado', 'creadoEn']);
+       allow create:
+        if perteneceAEmpresa(empresaId)
+        && empresaActiva(empresaId)
+        && request.resource.data.keys().hasAll(['nombre','nombreNormalizado','creadoEn'])
+        && request.resource.data.nombre is string
+        && request.resource.data.creadoEn is timestamp;
 
-        allow update: if perteneceAEmpresa(empresaId) && empresaActiva(empresaId);
+       allow update:
+        if perteneceAEmpresa(empresaId)
+        && empresaActiva(empresaId)
+        && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['nombre','nombreNormalizado','telefono','email','direccion']);
 
-        // Soft delete solamente
         allow delete: if false;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         COTIZACIONES - Validación estricta
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  COTIZACIONES               */
+      /* ─────────────────────────── */
 
       match /cotizaciones/{cotizacionId} {
 
-        allow read: if perteneceAEmpresa(empresaId);
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        allow create: if perteneceAEmpresa(empresaId) &&
-          empresaActiva(empresaId) &&
-          request.resource.data.keys().hasAll([
-            'numero', 'cliente', 'fecha', 'subtotal', 'iva', 'total',
-            'estado', 'eliminado'
-          ]) &&
-          request.resource.data.eliminado == false &&
-          request.resource.data.estado in ['Pendiente', 'En espera', 'Convertida', 'Cancelada'] &&
-          // 🔴 CRÍTICO: Validar montos son números, no strings
-          request.resource.data.total is number &&
-          request.resource.data.subtotal is number &&
-          request.resource.data.iva is number;
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.keys().hasAll([
+               'numero','cliente','fecha','subtotal',
+               'iva','total','estado','eliminado'
+             ])
+          && request.resource.data.total is number
+          && request.resource.data.subtotal is number
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.estado in
+             ['Pendiente','En espera','Convertida','Cancelada']
+          && request.resource.data.eliminado == false;
 
-        allow update: if perteneceAEmpresa(empresaId) &&
-          empresaActiva(empresaId) &&
-          // No se puede cambiar el número de cotización
-          request.resource.data.numero == resource.data.numero;
+        // Update: no se puede cambiar el número de la cotización
+        // Si eliminado == true, no se puede actualizar ningún otro campo (soft delete final)
+        allow update:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.numero == resource.data.numero
+          && (
+               // Si ya está eliminada, no se puede modificar nada más
+               resource.data.eliminado != true
+               // Solo se puede marcar como eliminada (soft delete), nunca revertir
+               || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eliminado','eliminadoEn'])
+             );
 
-        // Soft delete solamente
         allow delete: if false;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         GASTOS - Solo planes Premium y SuperPremium
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  GASTOS                     */
+      /* ─────────────────────────── */
 
       match /gastos/{gastoId} {
 
-        allow read: if perteneceAEmpresa(empresaId) &&
-          tieneFinanciero(empresaId);
+        allow read:
+          if (perteneceAEmpresa(empresaId) && tieneFinanciero(empresaId))
+          || esSuperAdmin();
 
-        allow create: if perteneceAEmpresa(empresaId) &&
-          tieneFinanciero(empresaId) &&
-          empresaActiva(empresaId) &&
-          request.resource.data.keys().hasAll(['fecha', 'categoria', 'valor']) &&
-          request.resource.data.valor is number;
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && tieneFinanciero(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.valor is number
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.valor > 0;
 
-        allow update: if perteneceAEmpresa(empresaId) &&
-          tieneFinanciero(empresaId) &&
-          empresaActiva(empresaId);
+
+        allow update:
+          if perteneceAEmpresa(empresaId)
+          && tieneFinanciero(empresaId)
+          && empresaActiva(empresaId);
 
         allow delete: if false;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         LIBRO DIARIO - Solo SuperPremium
-         🔴 CRÍTICO: Validación de doble partida en reglas
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  OCR USAGE — BLINDADO       */
+      /* ─────────────────────────── */
 
-      match /libroDiario/{asientoId} {
+      match /ocrUsage/{mesId} {
 
-        // Leer: solo plan SuperPremium
-        allow read: if perteneceAEmpresa(empresaId) &&
-          tieneContabilidad(empresaId);
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        // Crear: validar doble partida y estructura completa
-        allow create: if esContabilidad(empresaId) &&
-          tieneContabilidad(empresaId) &&
-          empresaActiva(empresaId) &&
-          // 🔴 Estructura obligatoria
-          request.resource.data.keys().hasAll([
-            'fecha', 'tipo', 'descripcion', 'lineas', 'total',
-            'cuadrado', 'creadoEn', 'creadoPor', 'origenTipo', 'origenId'
-          ]) &&
-          // 🔴 CRÍTICO: Debe estar cuadrado
-          request.resource.data.cuadrado == true &&
-          // 🔴 Debe tener al menos 2 líneas (débito y crédito)
-          request.resource.data.lineas is list &&
-          request.resource.data.lineas.size() >= 2 &&
-          // Fecha debe ser timestamp
-          request.resource.data.fecha is timestamp &&
-          // Usuario que creó
-          request.resource.data.creadoPor == request.auth.uid &&
-          // Total debe ser número
-          request.resource.data.total is number;
+        // Crear: count debe empezar en 1 exactamente
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && tieneOCR(empresaId)
+          && request.resource.data.count == 1;
 
-        // 🔴 CRÍTICO: Asientos NUNCA se modifican
-        // Solo se puede marcar como anulado
-        allow update: if esAdmin(empresaId) &&
-          tieneContabilidad(empresaId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['anulado', 'anuladoPor', 'anuladoEn']);
+        // Update: solo se permite incrementar count en exactamente +1
+        // Esto hace imposible que el usuario resetee el contador a 0 manualmente
+        allow update:
+          if perteneceAEmpresa(empresaId)
+          && tieneOCR(empresaId)
+          && request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasOnly(['count'])
+          && request.resource.data.count == resource.data.count + 1;
 
-        // 🔴 CRÍTICO: NUNCA eliminar asientos históricos
+
         allow delete: if false;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         ALERTAS CONTABLES - Solo lectura para usuarios
-      ══════════════════════════════════════════════════════════════ */
-
-      match /alertasContables/{alertaId} {
-
-        allow read: if perteneceAEmpresa(empresaId) &&
-          tieneContabilidad(empresaId);
-
-        // Solo el sistema puede crear (desde backend)
-        allow create: if esContabilidad(empresaId) &&
-          tieneContabilidad(empresaId);
-
-        // No se pueden modificar ni eliminar
-        allow update, delete: if false;
-      }
-
-      /* ══════════════════════════════════════════════════════════════
-         LOGS - Inmutables, solo admin puede leer
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  LOGS                       */
+      /* ─────────────────────────── */
 
       match /logs/{logId} {
 
-        // Leer: solo admins
-        allow read: if esAdmin(empresaId);
+        allow read:
+          if esAdmin(empresaId) || esSuperAdmin();
 
-        // Crear: cualquier usuario activo (auto-log)
-        allow create: if perteneceAEmpresa(empresaId) &&
-          request.resource.data.keys().hasAll(['accion', 'usuario', 'fecha']) &&
-          request.resource.data.usuario == request.auth.uid;
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && request.resource.data.keys().hasAll(['accion','usuario','fecha'])
+          && request.resource.data.usuario == request.auth.uid;
 
-        // 🔴 CRÍTICO: Logs son inmutables
         allow update, delete: if false;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         INVITACIONES - Control de acceso a empresa
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  INVITACIONES               */
+      /* ─────────────────────────── */
 
-      match /invitaciones/{invitacionId} {
+      match /invitaciones/{invId} {
 
-        allow read: if perteneceAEmpresa(empresaId) ||
-          // Usuario invitado puede leer su propia invitación
-          resource.data.email == request.auth.token.email;
+        allow read:
+          if perteneceAEmpresa(empresaId)
+          || resource.data.email == request.auth.token.email
+          || esSuperAdmin();
 
-        allow create: if esAdmin(empresaId) &&
-          empresaActiva(empresaId) &&
-          request.resource.data.keys().hasAll(['email', 'rol', 'creadoEn', 'token', 'expiraEn']) &&
-          // Token único para evitar reutilización
-          request.resource.data.token is string &&
-          // Expiración obligatoria (7 días)
-          request.resource.data.expiraEn is timestamp;
+        allow create:
+          if esAdmin(empresaId) && empresaActiva(empresaId);
 
-        allow update: if esAdmin(empresaId);
-
-        allow delete: if esAdmin(empresaId);
+        allow update, delete:
+          if esAdmin(empresaId) || esSuperAdmin();
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         PERIODOS CERRADOS - Control contable
-      ══════════════════════════════════════════════════════════════ */
+      /* ─────────────────────────── */
+      /*  LIBRO DIARIO               */
+      /* ─────────────────────────── */
+
+      match /libroDiario/{asientoId} {
+
+        allow read:
+          if (perteneceAEmpresa(empresaId) && tieneContabilidad(empresaId))
+          || esSuperAdmin();
+
+        allow create:
+          if perteneceAEmpresa(empresaId)
+          && tieneContabilidad(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.cuadrado == true
+          && request.resource.data.lineas.size() >= 2
+          && request.resource.data.lineas.size() <= 100;
+
+
+        // Solo se permite anular asientos, nunca modificar valores contables
+        allow update:
+          if (esAdmin(empresaId) || esSuperAdmin())
+          && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['anulado','anuladoPor','anuladoEn']);
+
+        allow delete: if false;
+      }
 
       match /periodosCerrados/{periodoId} {
 
-        allow read: if perteneceAEmpresa(empresaId) &&
-          tieneContabilidad(empresaId);
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
 
-        // Solo admin puede cerrar periodos
-        allow create: if esAdmin(empresaId) &&
-          tieneContabilidad(empresaId) &&
-          request.resource.data.keys().hasAll(['mes', 'anio', 'cerradoEn', 'cerradoPor']);
+        allow create:
+          if (esAdmin(empresaId) || esSuperAdmin())
+          && tieneContabilidad(empresaId);
 
-        // Periodo cerrado no se puede modificar ni eliminar
+        allow update, delete: if false;
+      }
+
+      /* ─────────────────────────── */
+      /*  ALERTAS CONTABLES          */
+      /* ─────────────────────────── */
+
+      match /alertasContables/{alertaId} {
+
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+        allow create:
+          if perteneceAEmpresa(empresaId) && tieneContabilidad(empresaId);
+
         allow update, delete: if false;
       }
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       USUARIOS META - Bootstrap de login (solo empresaId)
-       Permite que auth encuentre la empresa del usuario al iniciar sesión
-    ══════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════ */
+    /*  USUARIOS META — BLINDADO                      */
+    /* ═══════════════════════════════════════════════ */
 
     match /usuariosMeta/{uid} {
-      // Solo el propio usuario puede leer su meta
-      allow read: if isAuth() && request.auth.uid == uid;
 
-      // Solo el propio usuario puede crear/actualizar su meta
-      allow create, update: if isAuth() && request.auth.uid == uid &&
-        request.resource.data.keys().hasAll(['empresaId', 'email']) &&
-        request.resource.data.empresaId is string;
+      allow read:
+        if (isAuth() && request.auth.uid == uid)
+        || esSuperAdmin();
 
-      // Nunca eliminar
+      allow create:
+      if isAuth()
+      && request.auth.uid == uid
+      && request.resource.data.keys().hasAll(['empresaId','email'])
+      && empresaExiste(request.resource.data.empresaId);
+
+      // empresaId NO puede cambiar — un usuario no puede moverse entre empresas por su cuenta
+      allow update:
+        if isAuth()
+        && request.auth.uid == uid
+        && request.resource.data.empresaId == resource.data.empresaId;
+
       allow delete: if false;
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       SUPERADMIN GLOBAL - Control total del sistema
-    ══════════════════════════════════════════════════════════════ */
-
+    /* ═══════════════════════════════════════════════ */
+    /*  SUPERADMIN Y MÉTRICAS                         */
+    /* ═══════════════════════════════════════════════ */
     match /superadmin/{uid} {
-      // Solo superadmins pueden acceder
-      allow read, write: if esSuperAdmin();
+      allow read:
+        if esSuperAdmin()
+        || (isAuth() && request.auth.uid == uid);
+
+      allow create: if false; // SOLO DESDE CONSOLE
+      allow update, delete: if false;
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       MÉTRICAS SAAS - Dashboard interno
-    ══════════════════════════════════════════════════════════════ */
 
-    match /metricasSaas/{metricaId} {
-      // Solo superadmins
-      allow read, write: if esSuperAdmin();
+    match /metricasSaas/{id} { allow read, write: if esSuperAdmin(); }
+    match /metricas/{id}     { allow read, write: if esSuperAdmin(); }
+    match /pagos/{id}        { allow read, write: if esSuperAdmin(); }
+
+    match /errores/{id} {
+      allow read:   if esSuperAdmin();
+      allow create: if isAuth();
+      allow update, delete: if false;
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       PAGOS - Historial de facturación
-    ══════════════════════════════════════════════════════════════ */
+    /* ─────────────────────────── */
+    /*  COLECCIÓN LEGACY (Usuarios) */
+    /* ─────────────────────────── */
 
-    match /pagos/{pagoId} {
-      // Leer: usuario de la empresa o superadmin
-      allow read: if (resource.data.empresaId != null &&
-        perteneceAEmpresa(resource.data.empresaId)) ||
-        esSuperAdmin();
-
-      // Crear: solo superadmin (desde webhook de pago)
-      allow create, update: if esSuperAdmin();
-
-      // Nunca eliminar historial de pagos
+    match /Usuarios/{uid} {
+      allow read:
+        if (isAuth() && request.auth.uid == uid) || esSuperAdmin();
+      allow create, update:
+        if isAuth() && request.auth.uid == uid;
       allow delete: if false;
     }
 
-    /* ══════════════════════════════════════════════════════════════
-       BLOQUEO GLOBAL - Todo lo no especificado está bloqueado
-    ══════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════ */
+    /*  BLOQUEO TOTAL POR DEFECTO                     */
+    /* ═══════════════════════════════════════════════ */
 
     match /{document=**} {
       allow read, write: if false;

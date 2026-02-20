@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════
-//  GESTIUM · ocr.js
-//  OCR con Google Cloud Vision — Solo SuperPremium
-//  🔴 API key SOLO en variable GOOGLE_VISION_KEY de Netlify
+//  GESTIUM · ocr.js — OCR con Google Vision (SuperPremium/Premium)
+//  ✅ Envía token Firebase para seguridad real
+//  ✅ Muestra contador de uso mensual
 // ═══════════════════════════════════════════════════════
 
 import { $, toast, logError, lockBtn } from './utils.js';
 import { hasFeature } from './features.js';
 import { escribirLog } from './logs.js';
+import { auth } from './firebase.js';
 
 const MAX_SIZE_MB   = 4;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -30,29 +31,24 @@ function _bindEvents() {
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast("Solo se aceptan imágenes JPG, PNG, WEBP o GIF", "warn");
-      fileInput.value = "";
-      return;
+      fileInput.value = ""; return;
     }
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      toast(`La imagen supera ${MAX_SIZE_MB}MB. Comprime la imagen.`, "warn");
-      fileInput.value = "";
-      return;
+      toast(`La imagen supera ${MAX_SIZE_MB}MB`, "warn");
+      fileInput.value = ""; return;
     }
 
     const preview = $("ocrPreview");
     if (preview) {
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        preview.src = ev.target.result;
-        preview.style.display = "block";
-      };
+      reader.onload = (ev) => { preview.src = ev.target.result; preview.style.display = "block"; };
       reader.readAsDataURL(file);
     }
   });
 
   leerBtn?.addEventListener("click", async () => {
     if (!hasFeature("ocr")) {
-      toast("El OCR está disponible solo en Plan SuperPremium", "warn");
+      toast("El OCR requiere Plan Premium o SuperPremium", "warn");
       return;
     }
 
@@ -65,31 +61,39 @@ function _bindEvents() {
 
     try {
       const base64 = await _fileToBase64(file);
-      const texto  = await _llamarGoogleVision(base64);
+      const result = await _llamarOCR(base64);
 
       const textarea = $("ocrTexto");
-      if (textarea) textarea.value = texto;
-      if (hint)     hint.textContent = "✓ Lectura completada";
+      if (textarea) textarea.value = result.text || "Sin texto detectado";
 
-      await escribirLog("ocr_usado", `Procesó imagen OCR (${(file.size / 1024).toFixed(0)}KB)`);
+      // Mostrar contador de uso
+      if (hint && result.limite) {
+        hint.textContent = `✓ Listo · Usos este mes: ${result.usado}/${result.limite}`;
+        if (result.restante <= 3) hint.style.color = "#f59e0b";
+      } else if (hint) {
+        hint.textContent = "✓ Lectura completada";
+      }
+
+      await escribirLog("ocr_usado", `OCR procesado (${(file.size/1024).toFixed(0)}KB) · usos: ${result.usado}/${result.limite}`);
       toast("Texto extraído con Google Vision ✓", "success");
     } catch (err) {
       await logError("ocr", err.message);
-      if (hint) hint.textContent = "Error al leer la imagen";
-      toast("Error OCR: " + err.message, "error");
+      if (hint) { hint.textContent = ""; hint.style.color = ""; }
+      // Mostrar el mensaje de error real al usuario
+      toast(err.message, "error");
     } finally {
       unlock();
     }
   });
 
   limpiarBtn?.addEventListener("click", () => {
-    if (fileInput)  fileInput.value = "";
+    if (fileInput) fileInput.value = "";
     const preview = $("ocrPreview");
-    if (preview)  { preview.src = ""; preview.style.display = "none"; }
+    if (preview) { preview.src = ""; preview.style.display = "none"; }
     const textarea = $("ocrTexto");
     if (textarea)  textarea.value = "";
     const hint = $("ocrHint");
-    if (hint)      hint.textContent = "";
+    if (hint)  { hint.textContent = ""; hint.style.color = ""; }
   });
 
   usarBtn?.addEventListener("click", () => {
@@ -100,8 +104,6 @@ function _bindEvents() {
     if (medidas) {
       medidas.value = texto;
       toast("Medidas copiadas al cotizador ✓", "success");
-    } else {
-      toast("Copia el texto manualmente al campo de medidas", "info");
     }
   });
 }
@@ -115,31 +117,41 @@ function _fileToBase64(file) {
   });
 }
 
-// 🔴 Llama a la Netlify Function que tiene la API key de Google Vision
-// Variable de entorno requerida: GOOGLE_VISION_KEY
-async function _llamarGoogleVision(base64Image) {
+// Llama al backend con token Firebase para seguridad real
+async function _llamarOCR(base64Image) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sesión expirada. Inicia sesión nuevamente.");
+
+  let idToken;
   try {
-    const res = await fetch("/.netlify/functions/ocr", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ image: base64Image }),
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(errData.error || `Error ${res.status}`);
-    }
-
-    const data = await res.json();
-    return data.text || "Sin texto detectado en la imagen";
-
-  } catch (err) {
-    if (err.message.includes("Failed to fetch") || err.message.includes("404")) {
-      throw new Error(
-        "Función OCR no disponible en localhost. " +
-        "Sube el proyecto a Netlify y prueba desde la URL real."
-      );
-    }
-    throw err;
+    idToken = await user.getIdToken(true); // true = forzar refresh
+  } catch {
+    throw new Error("Error obteniendo token de sesión");
   }
+
+  let res;
+  try {
+    res = await fetch("/.netlify/functions/ocr", {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ image: base64Image }),
+    });
+  } catch {
+    throw new Error("OCR no disponible. Verifica que estés en la URL de Netlify, no en localhost.");
+  }
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    // Errores específicos con mensajes claros
+    if (res.status === 401) throw new Error("Sesión inválida. Recarga la página.");
+    if (res.status === 403) throw new Error(data.error || "Plan insuficiente para OCR.");
+    if (res.status === 429) throw new Error(data.error || "Límite OCR alcanzado este mes.");
+    throw new Error(data.error || `Error ${res.status} al procesar imagen`);
+  }
+
+  return data;
 }

@@ -344,9 +344,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, orderBy, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, runTransaction } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-const firebaseConfig={apiKey:"AIzaSyBJrHrwbp_udn-KuBAS75_dbOH4xsQW_KI",authDomain:"gestium-76570.firebaseapp.com",projectId:"gestium-76570",storageBucket:"gestium-76570.firebasestorage.app",messagingSenderId:"720694044667",appId:"1:720694044667:web:b864af5adb53e473690d5e"};
+const firebaseConfig={apiKey:"AIzaSyBF246-DxbLTyH-zXHlrSh92_Tq2JD7cfE",authDomain:"gestium-2d40b.firebaseapp.com",projectId:"gestium-2d40b",storageBucket:"gestium-2d40b.firebasestorage.app",messagingSenderId:"949260689854",appId:"1:949260689854:web:0b69f4e7d8ed0e9ac759ef"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const P={teal:'#06d6c8',teal2:'#22d3ee',teal3:'#67e8f9',orange:'#f97316',orange2:'#fb923c',amber:'#f59e0b',red:'#ef4444',green:'#10b981',navy:'#0d1629',gray:'#64748b',gray2:'#94a3b8'};
 const PALETTE=[P.teal,P.orange,P.amber,P.green,P.teal2,'#8b5cf6','#ec4899',P.gray2];
@@ -648,18 +648,22 @@ window.addEventListener('DOMContentLoaded',()=>{
     const mesI=$("mesReporte");
     if(!mesI.value){ const h=new Date(); mesI.value=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,"0")}`; }
     const anio=Number(mesI.value.substring(0,4)),mes=Number(mesI.value.substring(5,7))-1;
-    const snap=await getDocs(collection(db,"empresas",empresaId,"cotizaciones"));
+    // ✅ FIX: Filtrar por fecha en query, no cargar todo en memoria
+    const inicioMes=new Date(anio,mes,1),finMes=new Date(anio,mes+1,0,23,59,59);
+    const snap=await getDocs(query(collection(db,"empresas",empresaId,"cotizaciones"),
+      where("fecha",">=",Timestamp.fromDate(inicioMes)),
+      where("fecha","<=",Timestamp.fromDate(finMes)),
+      where("eliminado","!=",true),
+      orderBy("eliminado"),orderBy("fecha","desc")));
     const docs=[]; snap.forEach(d=>docs.push({id:d.id,...d.data()}));
     cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cant=0;
     const estCount={};
     docs.forEach(v=>{
-      if(!v?.fecha) return; const f=v.fecha.toDate();
-      if(f.getFullYear()===anio&&f.getMonth()===mes){
-        const e=v.estado||"Pendiente"; estCount[e]=(estCount[e]||0)+1;
-        if(filtroCliente&&String(v.cliente||"").trim().toLowerCase()!==filtroCliente.toLowerCase()) return;
-        cotizTotal+=Number(v.total||0); cant++;
-        if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); }
-      }
+      if(!v?.fecha) return;
+      const e=v.estado||"Pendiente"; estCount[e]=(estCount[e]||0)+1;
+      if(filtroCliente&&String(v.cliente||"").trim().toLowerCase()!==filtroCliente.toLowerCase()) return;
+      cotizTotal+=Number(v.total||0); cant++;
+      if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); }
     });
     $("kpiCotizado").textContent=clp(cotizTotal);
     $("kpiVentas").textContent=clp(vendidoTotal);
