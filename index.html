@@ -499,6 +499,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
   font-family:inherit;font-size:13px;color:var(--text);
   outline:none;transition:border-color .2s,box-shadow .2s;
 }
+  select.inp{
+    background: var(--navy3);
+    color: var(--white);
+    border: 1.5px solid rgba(6,214,200,.15);
+  }
 .inp::placeholder{color:var(--text3)}
 .inp:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(6,214,200,.08)}
 .inp-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
@@ -630,9 +635,13 @@ hr.sep{border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0}
       </a>
     </div>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:8px">
-      <a href="https://www.facebook.com/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">📘 Facebook</a>
-      <a href="https://www.instagram.com/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">📸 Instagram</a>
-      <a href="https://www.linkedin.com/company/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">💼 LinkedIn</a>
+      <a href="https://www.facebook.com/share/18DSCn8qA3/" target="_blank" rel="noopener noreferrer" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">
+        📘 Facebook
+      </a>
+    <a href="https://www.instagram.com/gestium_inteligencia_operativa?igsh=emJtamcyZWdmMW15" target="_blank" rel="noopener noreferrer" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">
+      📸 Instagram
+    </a>      
+    <a href="https://www.linkedin.com/company/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:11px;text-decoration:none;display:flex;align-items:center;gap:4px">💼 LinkedIn</a>
     </div>
   </div>
   <div class="login-panel">
@@ -753,9 +762,13 @@ hr.sep{border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0}
           </a>
         </div>
         <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap">
-          <a href="https://www.facebook.com/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:10px;text-decoration:none">📘 FB</a>
-          <a href="https://www.instagram.com/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:10px;text-decoration:none">📸 IG</a>
-          <a href="https://www.linkedin.com/company/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:10px;text-decoration:none">💼 LI</a>
+        <a href="https://www.facebook.com/share/18DSCn8qA3/" target="_blank" rel="noopener noreferrer" style="color:var(--text3);font-size:10px;text-decoration:none">
+          📘 FB
+        </a>        
+        <a href="https://www.instagram.com/gestium_inteligencia_operativa?igsh=emJtamcyZWdmMW15" target="_blank" rel="noopener noreferrer" style="color:var(--text3);font-size:10px;text-decoration:none">
+          📸 IG
+        </a>          
+        <a href="https://www.linkedin.com/company/GestiumInteligenciaOperativa" target="_blank" style="color:var(--text3);font-size:10px;text-decoration:none">💼 LI</a>
         </div>
       </div>
       <div class="user-pill">
@@ -1075,6 +1088,16 @@ window.addEventListener('DOMContentLoaded', () => {
   const registerScreen = $("registerScreen");
   const appDiv         = $("app");
 
+    document.addEventListener("click", async (e) => {
+    if (e.target && e.target.id === "sidebarLogout") {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        alert("Error cerrando sesión: " + err.message);
+      }
+    }
+  });
+
   let empresaId=null, empresaData=null, usuarioData=null, logoB64=null;
   let chartV=null, chartC=null, chartE=null;
   let ventasMes=[], cotizTotal=0, vendidoTotal=0;
@@ -1274,8 +1297,8 @@ window.addEventListener('DOMContentLoaded', () => {
   } catch(err){
     alert("Error cargando sesión: " + err.message);
     await signOut(auth);
-  }
-});
+  }});
+
 
 
   /* ── MOBILE ── */

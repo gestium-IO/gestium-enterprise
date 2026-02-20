@@ -103,19 +103,39 @@ export async function generarCotizacion() {
   let num = "";
 
   try {
-    await runTransaction(db, async tx => {
-      const es = await tx.get(empRef);
-      if (!es.exists()) throw new Error("Empresa no encontrada");
-      const cnt = (es.data().contador||0)+1;
-      num = "COT-"+String(cnt).padStart(3,"0");
-      tx.update(empRef, { contador:cnt });
-      tx.set(doc(collection(db,"empresas",_empresaId,"cotizaciones")), {
-        numero:num, cliente, fecha:Timestamp.fromDate(new Date()),
-        subtotal, iva:ivaT, total, m3:totalM3,
-        estado:"Pendiente", medidasTexto:texto, altura, precio, ivaPorcentaje:ivaP,
-        eliminado:false,
-      });
+  await runTransaction(db, async tx => {
+    const es = await tx.get(empRef);
+    if (!es.exists()) throw new Error("Empresa no encontrada");
+
+    const cnt = (es.data().contador || 0) + 1;
+    num = "COT-" + String(cnt).padStart(3, "0");
+
+    tx.update(empRef, { contador: cnt });
+
+    const cotRef = doc(
+      db,
+      "empresas",
+      _empresaId,
+      "cotizaciones",
+      num
+    );
+
+    tx.set(cotRef, {
+      numero: num,
+      cliente,
+      fecha: Timestamp.fromDate(new Date()),
+      subtotal,
+      iva: ivaT,
+      total,
+      m3: totalM3,
+      estado: "Pendiente",
+      medidasTexto: texto,
+      altura,
+      precio,
+      ivaPorcentaje: ivaP,
+      eliminado: false,
     });
+  });
   } catch(e) { toast("Error al guardar: "+e.message, "error"); return; }
 
   await escribirLog("cotizacion_generada", `Generó ${num} para ${cliente}`, { numero:num, total });
