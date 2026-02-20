@@ -59,10 +59,8 @@ export async function suscribirDashboard() {
   _unsub = onSnapshot(
     query(
       collection(db,"empresas",_empresaId,"cotizaciones"),
-      where("eliminado","!=",true),
       where("fecha",">=",Timestamp.fromDate(inicioQuery)),
       where("fecha","<=",Timestamp.fromDate(finQuery)),
-      orderBy("eliminado"),
       orderBy("fecha","desc")
     ),
     snap => {
@@ -94,21 +92,23 @@ function calcularYRender(docs) {
   let cotizTotal = 0, vendidoTotal = 0, cant = 0;
   const ventasMes = [], estCount = {};
 
+  let cantConf = 0;
   docs.forEach(v => {
     if (!v?.fecha) return;
+    if (v.eliminado === true || v.estado === "Cancelada") return;
     const f = v.fecha.toDate();
     if (f.getFullYear() !== anio || f.getMonth() !== mes) return;
     const e = v.estado || "Pendiente";
     estCount[e] = (estCount[e]||0)+1;
     if (filtroCliente && String(v.cliente||"").trim().toLowerCase() !== filtroCliente.toLowerCase()) return;
     cotizTotal += Number(v.total||0); cant++;
-    if (v.estado === "Convertida") { vendidoTotal += Number(v.total||0); ventasMes.push(v); }
+    if (v.estado === "Convertida") { vendidoTotal += Number(v.total||0); ventasMes.push(v); cantConf++; }
   });
 
   // KPIs
   if ($("kpiCotizado"))  $("kpiCotizado").textContent  = clp(cotizTotal);
   if ($("kpiVentas"))    $("kpiVentas").textContent    = clp(vendidoTotal);
-  if ($("kpiConversion")) $("kpiConversion").textContent = (cotizTotal > 0 ? ((vendidoTotal/cotizTotal)*100).toFixed(1) : 0) + "%";
+  if ($("kpiConversion")) $("kpiConversion").textContent = (cant > 0 ? (cantConf/cant*100).toFixed(1) : 0) + "%";
   if ($("kpiCantidad"))  $("kpiCantidad").textContent  = cant;
   if ($("kpiPromedio"))  $("kpiPromedio").textContent  = cant > 0 ? clp(cotizTotal/cant) : "$ 0";
 

@@ -90,7 +90,8 @@ export async function generarCotizacion() {
     let l = raw.trim().replace(/\s+/g,""); if (!l) return;
     let cant = 1;
     if (l.includes("-")) { const p = l.split("-"); cant = parseInt(p[0])||1; l = p[1]; }
-    const pts = l.includes("*") ? l.split("*") : l.split("x");
+    l = l.toUpperCase();
+    const pts = l.includes("*") ? l.split("*") : l.split("X");
     const a = parseFloat(pts[0]), b = parseFloat(pts[1]); if (!a||!b) return;
     const m3 = (a/100)*(b/100)*(altura/100)*cant, tl = m3*precio;
     subtotal += tl; totalM3 += m3;
@@ -151,8 +152,8 @@ export async function cargarTablaCotizaciones(paginar = false) {
 
   let q = query(
     collection(db,"empresas",_empresaId,"cotizaciones"),
-    where("eliminado","!=",true),
-    orderBy("eliminado"),
+    where("estado","!=","Cancelada"),
+    orderBy("estado"),
     orderBy("fecha","desc"),
     limit(PAGE_SIZE)
   );
@@ -202,7 +203,8 @@ window._redescargar = async function(id) {
   d.medidasTexto.split("\n").forEach(raw => {
     let l = raw.trim().replace(/\s+/g,""); if (!l) return;
     let cant=1; if(l.includes("-")){ const p=l.split("-"); cant=parseInt(p[0])||1; l=p[1]; }
-    const pts=l.includes("*")?l.split("*"):l.split("x");
+    l=l.toUpperCase();
+    const pts=l.includes("*")?l.split("*"):l.split("X");
     const a=parseFloat(pts[0]),b=parseFloat(pts[1]);
     const m3=(a/100)*(b/100)*(d.altura/100)*cant;
     filas.push([cant,a,b,d.altura,fmtM3(m3),clp(m3*d.precio)]);
@@ -250,8 +252,8 @@ window._accionCot = async function(id, accion) {
     if (!confirm("¿Eliminar esta cotización? Se ocultará pero no se borrará del sistema.")) return;
     // SOFT DELETE ✓
     const s = await getDoc(ref); const d = s.data()||{};
-    await updateDoc(ref, softDeleteUpdate());
-    await escribirLog("cotizacion_eliminada", `Eliminó ${d.numero||id} (soft delete)`);
+    await updateDoc(ref, { estado: "Cancelada" });
+    await escribirLog("cotizacion_eliminada", `Eliminó ${d.numero||id}`);
     toast("Cotización eliminada", "info");
   }
   await cargarTablaCotizaciones();
@@ -262,7 +264,7 @@ export async function exportarCSV() {
   if (!hasPermission("exportar_csv")) { toast("Sin permiso para exportar", "warn"); return; }
   const snap = await getDocs(
     query(collection(db,"empresas",_empresaId,"cotizaciones"),
-      where("eliminado","!=",true), orderBy("eliminado"), orderBy("fecha","desc"))
+      where("estado","!=","Cancelada"), orderBy("estado"), orderBy("fecha","desc"))
   );
   let csv = "N°,Cliente,Fecha,Subtotal,IVA,Total,m³,Estado\n";
   snap.forEach(ds => {

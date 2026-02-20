@@ -1101,7 +1101,7 @@
     let empresaId=null, empresaData=null, usuarioData=null, logoB64=null;
     let chartV=null, chartC=null, chartE=null;
     let ventasMes=[], cotizTotal=0, vendidoTotal=0;
-    let filtroCliente="";
+    let filtroCliente="", filtroEstado="";
 
     /* ── MODO REGISTRO ── */
     $("modeNuevaBtn").addEventListener("click",()=>{
@@ -1400,7 +1400,8 @@
         let l=raw.trim().replace(/\s+/g,""); if(!l) return;
         let cant=1;
         if(l.includes("-")){ const pts=l.split("-"); cant=parseInt(pts[0])||1; l=pts[1]; }
-        const pts=l.includes("*")?l.split("*"):l.split("x");
+        l=l.toUpperCase();
+        const pts=l.includes("*")?l.split("*"):l.split("X");
         const a=parseFloat(pts[0]),b=parseFloat(pts[1]); if(!a||!b) return;
         const m3=(a/100)*(b/100)*(altura/100)*cant, tl=m3*precio;
         subtotal+=tl; totalM3+=m3;
@@ -1450,7 +1451,7 @@
       docPdf.text("Gracias por confiar en "+(empresaData.nombre||"nosotros")+".",38,fy+80);
       if(empresaData.telefono) docPdf.text("Contacto: "+empresaData.telefono,38,fy+92);
       docPdf.save(num+" - "+cliente.replace(/\s+/g,"_")+".pdf");
-      actualizarDashboard(); alert("Cotización generada: "+num+" ✓");
+      await actualizarDashboard(); alert("Cotización generada: "+num+" ✓");
     });
 
     /* ── REDESCARGAR ── */
@@ -1468,7 +1469,8 @@
       d.medidasTexto.split("\n").forEach(raw=>{
         let l=raw.trim().replace(/\s+/g,""); if(!l) return;
         let cant=1; if(l.includes("-")){ const pts=l.split("-"); cant=parseInt(pts[0])||1; l=pts[1]; }
-        const pts=l.includes("*")?l.split("*"):l.split("x");
+        l=l.toUpperCase();
+        const pts=l.includes("*")?l.split("*"):l.split("X");
         const a=parseFloat(pts[0]),b=parseFloat(pts[1]);
         const m3=(a/100)*(b/100)*(d.altura/100)*cant;
         filas.push([cant,a,b,d.altura,formatM3(m3),clp(m3*d.precio)]);
@@ -1492,8 +1494,8 @@
         await updateDoc(ref,{estado:"Convertida"});
       }
       if(accion==="En espera") await updateDoc(ref,{estado:"En espera"});
-      if(accion==="Eliminar"){ if(!confirm("¿Eliminar cotización?")) return; await deleteDoc(ref); }
-      actualizarDashboard(); cargarCotizacionesMes();
+      if(accion==="Eliminar"){ if(!confirm("¿Eliminar cotización? Se ocultará del sistema.")) return; await updateDoc(ref,{estado:"Cancelada"}); }
+      await actualizarDashboard(); cargarCotizacionesMes();
     };
 
     /* ── REPORTE MENSUAL ── */
@@ -1566,6 +1568,16 @@
     /* ── DASHBOARD ── */
     $("actualizarDashboard").addEventListener("click", actualizarDashboard);
 
+    // Doble clic en el área del dashboard → limpiar filtros
+    $("moduloDashboard")?.addEventListener("dblclick", (evt)=>{
+      if(evt.target.closest("canvas")) return; // solo si no es un gráfico
+      if(filtroCliente||filtroEstado){
+        filtroCliente=""; filtroEstado="";
+        document.querySelectorAll(".filtro-on").forEach(el=>el.classList.remove("filtro-on"));
+        actualizarDashboard();
+      }
+    });
+
     async function actualizarDashboard(){
       if(!empresaId) return;
       document.body.style.cursor="wait";
@@ -1586,22 +1598,24 @@
 
       const docs=[]; snap.forEach(d=>docs.push({id:d.id,...d.data()}));
 
-      cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cantTotal=0;
+      cotizTotal=0; vendidoTotal=0; ventasMes=[]; let cantTotal=0, cantConfirmadas=0;
       const estadoCount={};
 
       docs.forEach(v=>{
         if(!v?.fecha) return;
+        if(v.eliminado===true||v.estado==="Cancelada") return; // excluir eliminadas
         const f=v.fecha.toDate();
         if(f.getFullYear()===anio && f.getMonth()===mes){
           const est=v.estado||"Pendiente";
           estadoCount[est]=(estadoCount[est]||0)+1;
           if(filtroCliente && String(v.cliente||"").trim().toLowerCase()!==filtroCliente.toLowerCase()) return;
+          if(filtroEstado && (v.estado||"Pendiente")!==filtroEstado) return;
           cotizTotal+=Number(v.total||0); cantTotal++;
-          if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); }
+          if(v.estado==="Convertida"){ vendidoTotal+=Number(v.total||0); ventasMes.push(v); cantConfirmadas++; }
         }
       });
 
-      actualizarKPIs(cantTotal);
+      actualizarKPIs(cantTotal, cantConfirmadas);
 
       if(!ventasMes.length){
         [chartV,chartC,chartE].forEach(c=>{if(c)c.destroy();}); chartV=chartC=chartE=null;
@@ -1662,14 +1676,17 @@
           options:{
             responsive:true,maintainAspectRatio:false,cutout:"70%",
             plugins:{
-              legend:{position:window.innerWidth<600?"bottom":"right",labels:{boxWidth:10,padding:14,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}},
+              legend:{position:window.innerWidth<600?"bottom":"right",labels:{boxWidth:10,padding:14,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0",generateLabels:chart=>{return chart.data.labels.map((l,i)=>{const v=chart.data.datasets[0].data[i];return {text:l+": "+clp(v),fillStyle:chart.data.datasets[0].backgroundColor[i],strokeStyle:chart.data.datasets[0].backgroundColor[i],lineWidth:0,hidden:false,index:i};});}}},
               tooltip:{backgroundColor:P.navy,titleColor:P.teal,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${clp(c.raw)} (${((c.raw/vendidoTotal)*100).toFixed(1)}%)`}}
             },
             animation:{animateScale:true,duration:900},
             onClick:(evt)=>{
               const pts=chartC.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);
-              filtroCliente=pts.length?(filtroCliente===clsCli[pts[0].index]?"":clsCli[pts[0].index]):"";
-              $("graficoClientes").parentElement.parentElement.classList.toggle("filtro-on",!!filtroCliente);
+              if(pts.length){ filtroCliente=(filtroCliente===clsCli[pts[0].index]?"":clsCli[pts[0].index]); }
+              else { filtroCliente=""; }
+              filtroEstado="";
+              $("graficoClientes")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroCliente);
+              $("graficoEstados")?.parentElement?.parentElement?.classList.remove("filtro-on");
               actualizarDashboard();
             }
           }
@@ -1693,10 +1710,19 @@
           options:{
             responsive:true,maintainAspectRatio:false,cutout:"65%",
             plugins:{
-              legend:{position:window.innerWidth<600?"bottom":"right",labels:{boxWidth:10,padding:14,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0"}},
+              legend:{position:window.innerWidth<600?"bottom":"right",labels:{boxWidth:10,padding:14,font:{size:11,family:"Syne",weight:"700"},color:"#e2e8f0",generateLabels:chart=>{return chart.data.labels.map((l,i)=>{const v=chart.data.datasets[0].data[i];return {text:l+": "+v,fillStyle:chart.data.datasets[0].backgroundColor[i],strokeStyle:chart.data.datasets[0].backgroundColor[i],lineWidth:0,hidden:false,index:i};});}}},
               tooltip:{backgroundColor:P.navy,titleColor:P.orange,bodyColor:"#e2e8f0",padding:12,callbacks:{label:c=>`${c.label}: ${c.raw} cotizaciones`}}
             },
-            animation:{animateScale:true,duration:800}
+            animation:{animateScale:true,duration:800},
+            onClick:(evt)=>{
+              const pts=chartE.getElementsAtEventForMode(evt,"nearest",{intersect:true},true);
+              if(pts.length){
+                const lbl=estLabels[pts[0].index];
+                filtroEstado=(filtroEstado===lbl?"":lbl);
+                $("graficoEstados")?.parentElement?.parentElement?.classList.toggle("filtro-on",!!filtroEstado);
+                actualizarDashboard();
+              }
+            }
           }
         });
       }
@@ -1706,7 +1732,7 @@
       if(!docs){ actualizarDashboard(); return; }
       const tbody=document.querySelector("#tablaCotizaciones tbody"); if(!tbody) return;
       tbody.innerHTML="";
-      docs.filter(d=>d.fecha&&d.fecha.toDate).forEach(d=>{
+      docs.filter(d=>d.fecha&&d.fecha.toDate&&d.estado!=="Cancelada"&&d.eliminado!==true).forEach(d=>{
         const f=d.fecha.toDate();
         if(f.getFullYear()!==anio||f.getMonth()!==mes) return;
         const badge=d.estado==="Convertida"
@@ -1733,10 +1759,10 @@
       });
     }
 
-    function actualizarKPIs(cant=0){
+    function actualizarKPIs(cant=0, cantConf=0){
       $("kpiCotizado").textContent=clp(cotizTotal);
       $("kpiVentas").textContent=clp(vendidoTotal);
-      $("kpiConversion").textContent=(cotizTotal>0?((vendidoTotal/cotizTotal)*100).toFixed(1):0)+"%";
+      $("kpiConversion").textContent=(cant>0?(cantConf/cant*100).toFixed(1):0)+"%";
       $("kpiCantidad").textContent=cant;
       $("kpiPromedio").textContent=cant>0?clp(cotizTotal/cant):"$ 0";
     }
