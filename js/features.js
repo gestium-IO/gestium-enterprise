@@ -82,3 +82,14 @@ export function verificarAccesoModulo(nombreModulo, featureRequerido) {
   return true;
 }
 
+
+/* ── DÍAS RESTANTES ── */
+export function diasRestantes(fecha) {
+  try {
+    const f = fecha?.toDate ? fecha.toDate() : new Date(fecha);
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    const diff = Math.ceil((f - hoy) / (1000 * 60 * 60 * 24));
+    return diff;
+  } catch(e) { return 0; }
+}

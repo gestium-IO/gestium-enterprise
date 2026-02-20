@@ -9,7 +9,7 @@ import {
   query, orderBy, limit, startAfter, where,
   Timestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-import { $, clp, fmtM3, fmt, toast, checkRateLimit, softDeleteUpdate } from './utils.js';
+import { $, clp, fmtM3, fmt, toast, checkRateLimit } from './utils.js';
 import { hasPermission, getLimits } from './features.js';
 import { escribirLog } from './logs.js';
 import { generarPDF, generarReporte } from './pdf.js';
