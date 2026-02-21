@@ -226,90 +226,87 @@ export function initAuthState(callbacks) {
     try {
       if (!user) { callbacks.onLogout(); setLoading(false); return; }
 
-    // 🔴 1️⃣ Verificar si es superadmin GLOBAL
-  const superSnap = await getDoc(doc(db, "superadmin", user.uid));
-
+   // 🔴 1️⃣ Verificar si es superadmin GLOBAL
+const superSnap = await getDoc(doc(db, "superadmin", user.uid));
 const cachedEmpId = localStorage.getItem(`gestium_emp_${user.uid}`);
 
-    if (superSnap.exists() && superSnap.data().activo === true && !cachedEmpId) {
+if (superSnap.exists() && superSnap.data().activo === true && !cachedEmpId) {
 
-      usuarioData = {
-        superadmin: true,
-        activo: true,
-        nombre: user.email,
-        rol: "superadmin"
-      };
+  empresaId = "GLOBAL_SUPERADMIN";
 
-      empresaId = null;
+  const globalSnap = await getDoc(doc(db, "empresas", empresaId));
 
-      empresaData = {
-        nombre: "Gestium Global",
-        plan: "superadmin",
-        activa: true,
-        global: true
-      };
+  if (!globalSnap.exists()) {
+    await doSignOut();
+    toast("Empresa global no configurada.", "error");
+    return;
+  }
 
-      initFeatures(empresaData, usuarioData);
-      callbacks.onLogin(user, empresaId, empresaData, usuarioData);
-      setLoading(false);
-      return;
+  empresaData = globalSnap.data();
+
+  usuarioData = {
+    superadmin: true,
+    activo: true,
+    nombre: user.email,
+    rol: "superadmin"
+  };
+
+  localStorage.setItem(`gestium_emp_${user.uid}`, empresaId);
+
+  initFeatures(empresaData, usuarioData);
+  callbacks.onLogin(user, empresaId, empresaData, usuarioData);
+  setLoading(false);
+  return;
+}
+
+// 🔵 FLUJO NORMAL (usuarios de empresa)
+
+let uData = null;
+let eId = null;
+
+// Intentar desde cache
+if (cachedEmpId) {
+  const uSnap = await getDoc(doc(db, "empresas", cachedEmpId, "usuarios", user.uid));
+  if (uSnap.exists()) { uData = uSnap.data(); eId = cachedEmpId; }
+}
+
+// Fallback por usuariosMeta
+if (!uData) {
+  const metaSnap = await getDoc(doc(db, "usuariosMeta", user.uid));
+  if (metaSnap.exists()) {
+    eId = metaSnap.data().empresaId;
+    if (eId) {
+      localStorage.setItem(`gestium_emp_${user.uid}`, eId);
+      const uSnap2 = await getDoc(doc(db, "empresas", eId, "usuarios", user.uid));
+      if (uSnap2.exists()) uData = uSnap2.data();
     }
-      // 🔴 CRÍTICO: Buscar usuario en superadmin primero,
-      // luego en subcolecciones de empresas
-      // Estrategia: el user token custom claims o buscar en empresas conocidas.
-      // Para bootstrap: guardamos el empresaId en localStorage como caché no crítico.
-      // La validación real la hacen las reglas Firestore.
-      
-      let uData = null;
-      let eId = null;
+  }
+}
 
-      // Intentar leer desde subcolección si tenemos empresaId cacheado
-      if (cachedEmpId) {
-        const uSnap = await getDoc(doc(db, "empresas", cachedEmpId, "usuarios", user.uid));
-        if (uSnap.exists()) { uData = uSnap.data(); eId = cachedEmpId; }
-      }
+if (!uData || !eId) {
+  await doSignOut();
+  toast("Usuario no configurado. Contacta al soporte.", "error");
+  return;
+}
 
-      // Si no encontramos (o no hay caché), buscar en todas las empresas del usuario
-      // (solo ocurre en primer login — después siempre está cacheado)
-      if (!uData) {
-        // Fallback: leer metaUsuario de colección global ligera (solo empresaId)
-        const metaSnap = await getDoc(doc(db, "usuariosMeta", user.uid));
-        if (metaSnap.exists()) {
-          eId = metaSnap.data().empresaId;
-          if (eId) {
-            localStorage.setItem(`gestium_emp_${user.uid}`, eId);
-            const uSnap2 = await getDoc(doc(db, "empresas", eId, "usuarios", user.uid));
-            if (uSnap2.exists()) uData = uSnap2.data();
-          }
-        }
-      }
+usuarioData = uData;
+if (!usuarioData.activo) {
+  await doSignOut();
+  toast("Usuario desactivado.", "warn");
+  return;
+}
 
-      if (!uData || !eId) {
-        await doSignOut();
-        toast("Usuario no configurado. Contacta al soporte.", "error");
-        return;
-      }
+empresaId = eId;
+localStorage.setItem(`gestium_emp_${user.uid}`, empresaId);
 
-      usuarioData = uData;
-      if (!usuarioData.activo) { await doSignOut(); toast("Usuario desactivado.", "warn"); return; }
+const eSnap = await getDoc(doc(db, "empresas", empresaId));
+if (!eSnap.exists()) {
+  await doSignOut();
+  toast("Empresa no encontrada.", "error");
+  return;
+}
 
-            empresaId = eId;
-      localStorage.setItem(`gestium_emp_${user.uid}`, empresaId);
-
-            // 🔵 Solo cargar empresa si NO es modo GLOBAL
-      let eSnap = null;
-
-      if (empresaId) {
-        eSnap = await getDoc(doc(db, "empresas", empresaId));
-
-        if (!eSnap.exists()) {
-          await doSignOut();
-          toast("Empresa no encontrada.", "error");
-          return;
-        }
-
-        empresaData = eSnap.data() || {};
-      }
+empresaData = eSnap.data() || {};
       // Suspensión
       if (empresaData.activa === false) { callbacks.onSuspended("Cuenta suspendida. Contacta al soporte."); return; }
 

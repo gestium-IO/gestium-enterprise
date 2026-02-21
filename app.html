@@ -873,6 +873,9 @@ initRegister();
 
 initAuthState({
   onLogin: async (user, empresaId, empresaData, usuarioData) => {
+    window._empresaId   = empresaId;
+  window._empresaData = empresaData;
+  window._usuarioData = usuarioData;
     $("sidebarEmpresaNombre").textContent = empresaData.nombre||"Mi Empresa";
     $("topbarTitle").textContent          = empresaData.nombre||"GESTIUM";
     $("sidebarUserName").textContent  = [usuarioData.nombre,usuarioData.apellido].filter(Boolean).join(" ")||"Usuario";
@@ -1008,14 +1011,20 @@ $("generarReporteBtn")?.addEventListener("click", async () => {
   const { auth: a } = await import('./js/firebase.js');
   const [anio,mes] = mv.split("-");
   // Necesitamos empresaId del módulo auth
-  const { empresaId, empresaData, usuarioData } = await import('./js/auth.js');
+  const empresaId = window._empresaId;
   const snap = await getDocs(q(col(db,"empresas",empresaId,"cotizaciones"), w("estado","==","Convertida"), ob("fecha","desc")));
   const cots = snap.docs.map(d=>d.data()).filter(v => {
     if(!v.fecha) return false; const f=v.fecha.toDate();
     return f.getFullYear()==parseInt(anio)&&(f.getMonth()+1)==parseInt(mes);
   });
   if(!cots.length) { toast("Sin ventas confirmadas en ese período","warn"); return; }
-  await generarReporte(empresaData, usuarioData, logoB64, mv, cots);
+  await generarReporte(
+  window._empresaData,
+  window._usuarioData,
+  logoB64,
+  mv,
+  cots
+);
   await escribirLog("reporte_generado", `Generó reporte mensual ${mv}`);
   toast("Reporte generado ✓","success");
 });
@@ -1035,14 +1044,14 @@ $("crearInvBtn")?.addEventListener("click", crearInvitacion);
 $("btnUploadLogo")?.addEventListener("click", () => $("logoInput")?.click());
 $("logoInput")?.addEventListener("change", async (evt) => {
   const file = evt.target.files[0]; if(!file) return;
-  const { empresaId, empresaData } = await import('./js/auth.js');
+  const empresaId = window._empresaId;
   try {
     // Intentar Firebase Storage; si falla (plan gratuito sin Storage), usar base64
     const imgRef = storageRef(storage, `logos/${empresaId}/${file.name}`);
     const snap = await uploadBytes(imgRef, file);
     const url  = await getDownloadURL(snap.ref);
     await updateDoc(doc(db,"empresas",empresaId), { logoUrl:url, logo:null });
-    logoB64 = url; empresaData.logoUrl = url;
+    logoB64 = url;window._empresaData.logoUrl = url;
     $("logoPreview").src = url; $("logoPreview").style.display="block";
     await escribirLog("logo_actualizado","Actualizó logo (Storage)");
     toast("Logo actualizado ✓","success");
@@ -1051,7 +1060,7 @@ $("logoInput")?.addEventListener("change", async (evt) => {
     const r = new FileReader(); r.onload = async () => {
       const b64 = r.result;
       await updateDoc(doc(db,"empresas",empresaId), { logo:b64 });
-      logoB64 = b64; empresaData.logo = b64;
+      logoB64 = b64;window._empresaData.logo = b64;
       $("logoPreview").src = b64; $("logoPreview").style.display="block";
       await escribirLog("logo_actualizado","Actualizó logo (base64)");
       toast("Logo guardado ✓","success");
@@ -1061,10 +1070,10 @@ $("logoInput")?.addEventListener("change", async (evt) => {
 
 // ── Backup / Restore ──
 $("backupBtn")?.addEventListener("click", async () => {
-  const { empresaId, empresaData } = await import('./js/auth.js');
+  const empresaId = window._empresaId;
   const cS = await getDocs(collection(db,"empresas",empresaId,"clientes"));
   const vS = await getDocs(collection(db,"empresas",empresaId,"cotizaciones"));
-  const data = { clientes:cS.docs.map(d=>({id:d.id,...d.data()})), cotizaciones:vS.docs.map(d=>({id:d.id,...d.data()})), empresa:empresaData, exportadoEn:new Date().toISOString() };
+  const data = { clientes:cS.docs.map(d=>({id:d.id,...d.data()})), cotizaciones:vS.docs.map(d=>({id:d.id,...d.data()})), empresa:window._empresaData, exportadoEn:new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const url = URL.createObjectURL(blob), a = document.createElement("a");
   a.href=url; a.download=`gestium_backup_${empresaId}_${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
@@ -1085,10 +1094,8 @@ $("sidebarLogout")?.addEventListener("click", doSignOut);
 // ── Notificaciones ──
 $("notifBtn")?.addEventListener("click", () => $("notifPanel")?.classList.toggle("show"));
 $("btnMarcarLeidas")?.addEventListener("click", marcarNotificacionesLeidas);
-document.addEventListener("click", e => {
-  if (!$("notifPanel")?.contains(e.target) && e.target !== $("notifBtn"))
-    $("notifPanel")?.classList.remove("show");
-});
+if (!$("notifPanel")?.contains(e.target) && 
+    !$("notifBtn")?.contains(e.target))
 
 // ── Mobile sidebar ──
 $("menuToggle")?.addEventListener("click", () => {
@@ -1103,7 +1110,7 @@ async function cargarUsuarios() {
   const tbody = document.querySelector("#tablaUsuarios tbody");
   if(!tbody) return;
 
-  const { empresaId } = await import('./js/auth.js');
+ const empresaId = window._empresaId;
 
   const snap = await getDocs(
     collection(db,"empresas", empresaId, "usuarios")
