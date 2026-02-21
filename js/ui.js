@@ -29,6 +29,37 @@ export function buildSidebar(empresaData, usuarioData) {
   const nav = $("sbNav");
   if (!nav) return;
 
+  // ✅ FIX: Mostrar banner rojo de SOPORTE ACTIVO cuando superadmin está en empresa
+  const soporteEmpresaId = localStorage.getItem("gestium_soporte_activo");
+  if (soporteEmpresaId && usuarioData?.superadmin) {
+    let bannerSoporte = document.getElementById("bannerSoporteActivo");
+    if (!bannerSoporte) {
+      bannerSoporte = document.createElement("div");
+      bannerSoporte.id = "bannerSoporteActivo";
+      bannerSoporte.style.cssText = "background:#dc2626;color:#fff;text-align:center;padding:8px 12px;font-size:13px;font-weight:700;position:sticky;top:0;z-index:9999;";
+      bannerSoporte.innerHTML = `🔴 SOPORTE ACTIVO — Empresa: ${soporteEmpresaId} <button onclick="localStorage.removeItem('gestium_soporte_activo');location.reload();" style="background:rgba(255,255,255,0.25);border:none;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer;margin-left:8px;font-size:12px;">Salir</button>`;
+      document.body.prepend(bannerSoporte);
+    }
+  }
+
+  if (empresaData?.global === true) {
+    nav.innerHTML = `
+      <div class="sb-section">ADMIN</div>
+      <button class="sb-item active" data-modulo="superadmin">
+        <span style="font-size:16px">⚙️</span>
+        <span style="flex:1">Superadmin</span>
+      </button>
+    `;
+
+    nav.querySelector('[data-modulo="superadmin"]')
+      ?.addEventListener("click", () => {
+        mostrarModulo("superadmin");
+      });
+
+    return;
+  }
+  
+
   nav.innerHTML = "";
 
   // Sección principal
@@ -93,6 +124,7 @@ export function mostrarModulo(nombre) {
 }
 
 function _capitalize(s) {
+  if (s === "ocr") return "OCR";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 

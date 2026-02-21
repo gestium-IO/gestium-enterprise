@@ -3,7 +3,7 @@
 //  Utilidades globales — helpers puros sin dependencias
 // ═══════════════════════════════════════════════════════
 
-import { db } from './firebase.js';
+import { db, auth } from './firebase.js';
 import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 /* ── SELECTOR RÁPIDO ── */
@@ -48,7 +48,12 @@ export async function logError(contexto, mensaje, extra = {}) {
       contexto,
       mensaje: String(mensaje).slice(0, 500),
       extra,
-      fecha: Timestamp.fromDate(new Date()),
+      fecha:     Timestamp.fromDate(new Date()),
+      // ✅ FIX: Incluir usuario y empresa para trazabilidad en superadmin
+      usuario:   auth?.currentUser?.uid  || "anonimo",
+      email:     auth?.currentUser?.email || "—",
+      tipo:      contexto, // campo tipo para badge en panel superadmin
+      empresaId: extra?.empresaId || "—",
     });
   } catch (e) {
     // Silenciar para no crear bucle infinito

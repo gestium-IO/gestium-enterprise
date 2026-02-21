@@ -11,11 +11,13 @@ import {
 import { $, clp, fmtShort, fmt, toast } from './utils.js';
 import { MRR_PLANS } from './features.js';
 import { escribirLog } from './logs.js';
+import { entrarComoEmpresa } from './auth.js';
 
 let _empresaIdAdmin = null;
 
 export function initSuperadmin(empresaId) {
-  _empresaIdAdmin = empresaId;
+  // "GLOBAL" o null son el empresaId del superadmin sin empresa seleccionada
+  _empresaIdAdmin = (empresaId === "GLOBAL" || !empresaId) ? null : empresaId;
 }
 
 export async function cargarSuperadmin() {
@@ -111,6 +113,14 @@ function renderEmpresasGrid(empresas) {
           <option value="extender90">📅 +90 días vencimiento</option>
           <option value="verID">📋 Copiar ID empresa</option>
         </select>
+        <button 
+        style="margin-top:8px;width:100%;padding:8px 10px;
+              background:var(--teal);color:#070d1a;
+              border:none;border-radius:6px;
+              font-weight:700;font-size:12px;cursor:pointer"
+        onclick="window._entrarEmpresa('${e.id}')">
+        🚀 Entrar como empresa
+      </button>
       </div>
     </div>`;
   }).join("");
@@ -134,9 +144,14 @@ window._saAccion = async function(empId, accion) {
   } else if (accion === "extender30" || accion === "extender90") {
     const dias = accion === "extender30" ? 30 : 90;
     const s = await getDoc(ref);
-    const actual = s.data()?.vencimiento?.toDate() || new Date();
+    const sd = s.data() || {};
+    const actual = (sd.fechaVencimiento || sd.vencimiento)?.toDate() || new Date();
     const nueva  = new Date(actual); nueva.setDate(nueva.getDate()+dias);
-    await updateDoc(ref, { vencimiento:Timestamp.fromDate(nueva) });
+    // ✅ FIX: Actualizar AMBOS campos (auth.js lee fechaVencimiento con fallback a vencimiento)
+    await updateDoc(ref, {
+      fechaVencimiento: Timestamp.fromDate(nueva),
+      vencimiento:      Timestamp.fromDate(nueva),
+    });
     toast(`Vencimiento extendido +${dias} días ✓`, "success");
   } else if (accion === "verID") {
     navigator.clipboard.writeText(empId).catch(()=>{});
@@ -146,7 +161,9 @@ window._saAccion = async function(empId, accion) {
   await escribirLog("admin_accion", `[ADMIN] Ejecutó "${accion}" en empresa ${empId.slice(0,8)}…`, { empId });
   await cargarSuperadmin(); // refrescar
 };
-
+window._entrarEmpresa = function(empId) {
+  entrarComoEmpresa(empId);
+};
 /* ── VISOR DE ERRORES ── */
 async function cargarErrores() {
   const tbody = document.querySelector("#tablaErrores tbody");

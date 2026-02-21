@@ -18,7 +18,7 @@ body{font-family:'Syne',system-ui,sans-serif;background:var(--navy);color:var(--
 nav{padding:24px 60px;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:10;border-bottom:1px solid rgba(255,255,255,.04)}
 .nav-logo{font-size:20px;font-weight:800;color:var(--white);letter-spacing:2px}
 .nav-logo span{color:var(--orange)}
-.nav-links{display:flex;gap:10px;align-items:center}
+.nav-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .nav-btn{padding:10px 22px;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;transition:all .2s;border:none;letter-spacing:.3px}
 .nav-btn.ghost{background:none;color:var(--teal);border:1px solid rgba(6,214,200,.2)}
 .nav-btn.ghost:hover{background:rgba(6,214,200,.08)}
@@ -77,7 +77,7 @@ footer{background:var(--navy2);border-top:1px solid rgba(255,255,255,.05);paddin
 .footer-links{display:flex;gap:24px;flex-wrap:wrap}
 .footer-links a{font-size:13px;color:var(--text2);text-decoration:none;transition:color .2s}
 .footer-links a:hover{color:var(--teal)}
-@media(max-width:768px){nav,footer{padding:20px 24px}.section{padding:60px 24px}.hero-content{padding:60px 20px}.nav-links{gap:6px}}
+@media(max-width:768px){nav,footer{padding:20px 24px}.section{padding:60px 24px}.hero-content{padding:60px 20px}.nav-links{gap:6px;width:100%;justify-content:center}.nav-btn{font-size:12px;padding:9px 16px}}
 </style>
 </head>
 <body>

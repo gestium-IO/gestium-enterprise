@@ -166,6 +166,9 @@ export async function crearAsientoAutomatico(tipo, datos) {
       asiento.origenTipo = tipo;
       asiento.origenId = datos.id || "";
       asiento.cuadrado = true;
+      // ✅ FIX: Agregar campo mes para que la regla de cierre mensual pueda validar
+      const _now = new Date();
+      asiento.mes = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}`;
       
       await addDoc(collection(db,"empresas",_empId,"libroDiario"), asiento);
     } catch(e) {
@@ -190,6 +193,10 @@ export async function crearAsientoManual(datos) {
     cuadrado: true,
     creadoEn: Timestamp.fromDate(new Date()),
     manual: true,
+    // ✅ FIX: Agregar campo mes para que la regla de cierre mensual pueda validar
+    mes: datos.fecha
+      ? `${new Date(datos.fecha).getFullYear()}-${String(new Date(datos.fecha).getMonth()+1).padStart(2,"0")}`
+      : `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`,
   });
   await escribirLog("asiento_manual_creado", `Creó asiento manual: ${datos.descripcion}`);
   toast("Asiento creado ✓","success");
@@ -323,8 +330,6 @@ export async function cargarCxCyP() {
         collection(db,"empresas",_empId,"cotizaciones"),
         where("estado","==","Convertida"),
         where("fecha",">=",Timestamp.fromDate(inicio90)),
-        where("eliminado","!=",true),
-        orderBy("eliminado"),
         orderBy("fecha","desc"),
         limit(200)
       )
@@ -333,7 +338,8 @@ export async function cargarCxCyP() {
       query(
         collection(db,"empresas",_empId,"gastos"),
         where("fecha",">=",Timestamp.fromDate(inicio30)),
-        where("eliminado","==",false),
+        where("estado","!=","Cancelada"),
+        orderBy("estado"),
         orderBy("fecha","desc"),
         limit(100)
       )
@@ -403,7 +409,7 @@ export async function calcularImpuestos(mes) {
 // ══════════════════════════════════════════════════════
 export async function proyectarFlujoCaja() {
   // Obtener promedios históricos de los últimos 3 meses
-  const snap = await getDocs(collection(db,"empresas",_empId,"libroDiario"));
+  // ✅ FIX: Eliminada getDocs sin filtro — calcularFlujoCaja ya tiene sus propios filtros
   const entPromedio=[], salPromedio=[];
   for(let m=1;m<=3;m++) {
     const ref = new Date(); ref.setMonth(ref.getMonth()-m);
@@ -472,8 +478,12 @@ export async function verificarAlertasFinancieras() {
   }
 
   // Gastos fuera del promedio
+  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
   const snapG = await getDocs(
-    query(collection(db,"empresas",_empId,"gastos"), where("eliminado","!=",true), orderBy("eliminado"))
+    query(collection(db,"empresas",_empId,"gastos"),
+      where("fecha",">=",Timestamp.fromDate(inicioMes)),
+      orderBy("fecha","desc")
+    )
   );
   let totalGastosMes=0, cnt=0;
   snapG.forEach(d => {
@@ -501,9 +511,20 @@ export async function verificarAlertasFinancieras() {
 // NIVEL 2 · RENTABILIDAD POR CLIENTE
 // ══════════════════════════════════════════════════════
 export async function calcularRentabilidadClientes() {
+  // ✅ FIX: Agregar filtro de fecha (últimos 12 meses) y limit para evitar timeouts
+  const hace12m = new Date(); hace12m.setFullYear(hace12m.getFullYear() - 1);
   const [cotsSnap, gastosSnap] = await Promise.all([
-    getDocs(query(collection(db,"empresas",_empId,"cotizaciones"), where("estado","==","Convertida"), where("eliminado","!=",true), orderBy("eliminado"))),
-    getDocs(query(collection(db,"empresas",_empId,"gastos"), where("eliminado","!=",true), orderBy("eliminado"))),
+    getDocs(query(collection(db,"empresas",_empId,"cotizaciones"),
+      where("estado","==","Convertida"),
+      where("fecha",">=",Timestamp.fromDate(hace12m)),
+      orderBy("fecha","desc"),
+      limit(500)
+    )),
+    getDocs(query(collection(db,"empresas",_empId,"gastos"),
+      where("fecha",">=",Timestamp.fromDate(hace12m)),
+      orderBy("fecha","desc"),
+      limit(500)
+    )),
   ]);
   const clientes = {};
   cotsSnap.forEach(d => {
@@ -583,9 +604,14 @@ export async function calcularKPIsEjecutivos(mes) {
   const cxc = await cargarCxCyP();
 
   // Días promedio de pago de clientes
+  const hace12m2 = new Date(); hace12m2.setFullYear(hace12m2.getFullYear() - 1);
   const snap = await getDocs(
     query(collection(db,"empresas",_empId,"cotizaciones"),
-      where("estado","==","Convertida"), where("eliminado","!=",true), orderBy("eliminado"))
+      where("estado","==","Convertida"),
+      where("fecha",">=",Timestamp.fromDate(hace12m2)),
+      orderBy("fecha","desc"),
+      limit(500)
+    )
   );
   let sumDias=0, cntPagados=0;
   snap.forEach(d=>{
@@ -620,9 +646,14 @@ export async function calcularKPIsEjecutivos(mes) {
 // NIVEL 3 · ANÁLISIS DE RIESGO POR CLIENTE (Score)
 // ══════════════════════════════════════════════════════
 export async function calcularRiesgoClientes() {
+  // ✅ FIX: Agregar filtro de fecha (últimos 12 meses) y limit para evitar timeouts
+  const hace12mRiesgo = new Date(); hace12mRiesgo.setFullYear(hace12mRiesgo.getFullYear() - 1);
   const snap = await getDocs(
     query(collection(db,"empresas",_empId,"cotizaciones"),
-      where("eliminado","!=",true), orderBy("eliminado"), orderBy("fecha","desc"))
+      where("fecha",">=",Timestamp.fromDate(hace12mRiesgo)),
+      orderBy("fecha","desc"),
+      limit(500)
+    )
   );
   const clientes = {};
   snap.forEach(d => {

@@ -1,0 +1,15 @@
+{
+  "firestore": {
+    "rules": "reglas/firestore_production.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "reglas/**"
+    ]
+  }
+}

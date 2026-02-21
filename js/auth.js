@@ -10,7 +10,7 @@ import {
   setPersistence, browserLocalPersistence, browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, collection, Timestamp, updateDoc
+  doc, getDoc, setDoc, collection, Timestamp, updateDoc, increment
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { $, toast, logError, diasRestantes } from './utils.js';
 import { initFeatures, hasFeature, isSuperAdmin } from './features.js';
@@ -21,6 +21,35 @@ export let empresaData = null;
 export let usuarioData = null;
 
 export function setEmpresaData(data) { empresaData = data; }
+
+export async function entrarComoEmpresa(nuevoEmpresaId) {
+  if (!usuarioData?.superadmin) return;
+
+  const snap = await getDoc(doc(db, "empresas", nuevoEmpresaId));
+  if (!snap.exists()) {
+    toast("Empresa no encontrada", "error");
+    return;
+  }
+
+  empresaId = nuevoEmpresaId;
+  empresaData = snap.data();
+
+  localStorage.setItem(`gestium_emp_${auth.currentUser.uid}`, nuevoEmpresaId);
+
+  initFeatures(empresaData, usuarioData);
+
+  // ✅ FIX: Desuscribir todos los listeners onSnapshot activos antes del reload
+  // para evitar que se disparen con datos de la empresa anterior
+  if (window._gestiumUnsubscribers && Array.isArray(window._gestiumUnsubscribers)) {
+    window._gestiumUnsubscribers.forEach(unsub => { try { unsub(); } catch(e) {} });
+    window._gestiumUnsubscribers = [];
+  }
+
+  // ✅ FIX: Banner de SOPORTE ACTIVO visible al entrar como empresa
+  localStorage.setItem("gestium_soporte_activo", nuevoEmpresaId);
+
+  location.reload();
+}
 
 /* ── LOGIN ── */
 export function initLogin() {
@@ -138,6 +167,9 @@ export function initRegister() {
           activa: true,
           creadaEn: Timestamp.fromDate(new Date()),
           onboardingCompletado: false,
+          // ✅ Contadores cacheados para superadmin (evitan subqueries O(N))
+          userCount: 1, // empieza en 1 (el dueño)
+          cotCount:  0, // se incrementa en generarCotizacion()
         });
       } else {
         empId = idExt;
@@ -153,6 +185,10 @@ export function initRegister() {
       }
 
       // 🔴 CRÍTICO: Guardar usuario en subcolección de empresa (multiempresa)
+      // Incrementar userCount si se une a empresa existente
+      if (modo === "existente") {
+        await updateDoc(doc(db, "empresas", empId), { userCount: increment(1) });
+      }
       await setDoc(doc(db, "empresas", empId, "usuarios", user.uid), {
         email: user.email,
         nombre: nomUser,
@@ -193,36 +229,37 @@ export function initAuthState(callbacks) {
     // 🔴 1️⃣ Verificar si es superadmin GLOBAL
   const superSnap = await getDoc(doc(db, "superadmin", user.uid));
 
-      if (superSnap.exists() && superSnap.data().activo === true) {
-        usuarioData = {
-          superadmin: true,
-          activo: true,
-          nombre: user.email,
-          rol: "superadmin"
-        };
+const cachedEmpId = localStorage.getItem(`gestium_emp_${user.uid}`);
 
-        // ✅ MODO GLOBAL
-        empresaId = "GLOBAL";
+    if (superSnap.exists() && superSnap.data().activo === true && !cachedEmpId) {
 
-        empresaData = {
-          nombre: "Gestium Global",
-          plan: "superadmin",
-          activa: true,
-          global: true
-        };
+      usuarioData = {
+        superadmin: true,
+        activo: true,
+        nombre: user.email,
+        rol: "superadmin"
+      };
 
-        initFeatures(empresaData, usuarioData);
-        callbacks.onLogin(user, empresaId, empresaData, usuarioData);
-        setLoading(false);
-        return;
-      }
+      empresaId = null;
+
+      empresaData = {
+        nombre: "Gestium Global",
+        plan: "superadmin",
+        activa: true,
+        global: true
+      };
+
+      initFeatures(empresaData, usuarioData);
+      callbacks.onLogin(user, empresaId, empresaData, usuarioData);
+      setLoading(false);
+      return;
+    }
       // 🔴 CRÍTICO: Buscar usuario en superadmin primero,
       // luego en subcolecciones de empresas
       // Estrategia: el user token custom claims o buscar en empresas conocidas.
       // Para bootstrap: guardamos el empresaId en localStorage como caché no crítico.
       // La validación real la hacen las reglas Firestore.
-      let cachedEmpId = localStorage.getItem(`gestium_emp_${user.uid}`);
-
+      
       let uData = null;
       let eId = null;
 
@@ -259,10 +296,10 @@ export function initAuthState(callbacks) {
             empresaId = eId;
       localStorage.setItem(`gestium_emp_${user.uid}`, empresaId);
 
-      // 🔵 Solo cargar empresa si NO es modo GLOBAL
+            // 🔵 Solo cargar empresa si NO es modo GLOBAL
       let eSnap = null;
 
-      if (empresaId !== "GLOBAL") {
+      if (empresaId) {
         eSnap = await getDoc(doc(db, "empresas", empresaId));
 
         if (!eSnap.exists()) {

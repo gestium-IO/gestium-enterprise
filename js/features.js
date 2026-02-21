@@ -28,7 +28,8 @@ export const PLAN_LIMITS = {
   premium:      { cotizacionesDia:50,   pdfHora:10,  gastos:true,  contabilidad:false, ocr:false },
   superpremium: { cotizacionesDia:999,  pdfHora:999, gastos:true,  contabilidad:true,  ocr:true  },
   superadmin:   { cotizacionesDia:9999, pdfHora:999, gastos:true,  contabilidad:true,  ocr:true  },
-
+  // ✅ FIX: "enterprise" es alias de superadmin (auth.js lo asigna en modo global)
+  enterprise:   { cotizacionesDia:9999, pdfHora:999, gastos:true,  contabilidad:true,  ocr:true  },
 };
 
 export const PLAN_FEATURES = {
@@ -37,6 +38,7 @@ export const PLAN_FEATURES = {
   premium:      ["cotizaciones","dashboard","finanzas","logs","usuarios","invitaciones"],
   superpremium: ["cotizaciones","dashboard","finanzas","logs","usuarios","invitaciones","contabilidad","ocr"],
   superadmin:   ["cotizaciones","dashboard","finanzas","logs","usuarios","invitaciones","contabilidad","ocr","superadmin"],
+  enterprise:   ["cotizaciones","dashboard","finanzas","logs","usuarios","invitaciones","contabilidad","ocr","superadmin"],
 };
 
 export const ROLE_PERMISSIONS = {
@@ -50,7 +52,7 @@ export const MRR_PLANS = { basico:65000, premium:119000, superpremium:229000, tr
 let _e=null,_u=null;
 
 export function initFeatures(e,u){_e=e;_u=u;}
-export function efectivoPlan(){if(_u?.superadmin)return"superadmin";return _e?.plan||"trial";}
+export function efectivoPlan(){if(_u?.superadmin)return"superadmin";const p=_e?.plan||"trial";return p==="enterprise"?"superadmin":p;}
 export function hasFeature(f){return(PLAN_FEATURES[efectivoPlan()]||[]).includes(f);}
 export function hasPermission(p){if(_u?.superadmin)return true;return(ROLE_PERMISSIONS[_u?.rol||"vendedor"]||[]).includes(p);}
 export function isSuperAdmin(){return _u?.superadmin===true;}

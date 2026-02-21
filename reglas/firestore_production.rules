@@ -55,9 +55,11 @@ service cloud.firestore {
         && getRol(empresaId) == "admin";
     }
 
+    // ✅ FIX #3: esSuperAdmin valida que el documento tenga activo == true
     function esSuperAdmin() {
       return isAuth()
-        && exists(/databases/$(database)/documents/superadmin/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/superadmin/$(request.auth.uid))
+        && get(/databases/$(database)/documents/superadmin/$(request.auth.uid)).data.activo == true;
     }
 
     function getPlan(empresaId) {
@@ -77,6 +79,11 @@ service cloud.firestore {
       return getPlan(empresaId) == "superpremium";
     }
 
+    // ✅ FIX #4: Función para verificar que el mes no está cerrado
+    function mesNoCerrado(empresaId, mesId) {
+      return !exists(/databases/$(database)/documents/empresas/$(empresaId)/cierres/$(mesId));
+    }
+
     /* ============================
        EMPRESAS
     ============================ */
@@ -90,15 +97,22 @@ service cloud.firestore {
         )
         || esSuperAdmin();
 
+      // ✅ FIX #2: Validar que plan sea uno de los valores permitidos al crear empresa
       allow create:
         if isAuth()
         && !usuarioMetaExiste()
         && request.resource.data.keys().hasAll(['nombre','plan','activa','contador'])
         && request.resource.data.plan in ['trial','basico','premium','superpremium'];
 
+      // ✅ FIX #1: Admin solo puede editar campos de perfil, NO plan/activa/fechaVencimiento
       allow update:
         if esSuperAdmin()
-        || esAdmin(empresaId);
+        || (
+          esAdmin(empresaId)
+          && request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['nombre','nit','telefono','direccion','logo','onboardingCompletado','iva'])
+        );
 
       allow delete: if false;
 
@@ -188,7 +202,17 @@ service cloud.firestore {
           if perteneceAEmpresa(empresaId)
           && empresaActiva(empresaId)
           && request.resource.data.total is number
-          && request.resource.data.fecha is timestamp;
+          && request.resource.data.subtotal is number
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.estado is string
+          && request.resource.data.creadoPor is string;
+
+        allow update:
+          if perteneceAEmpresa(empresaId)
+          && empresaActiva(empresaId)
+          && request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['estado','pagada','fechaPago','pagadoEn']);
 
         allow delete: if false;
       }
@@ -205,12 +229,18 @@ service cloud.firestore {
         allow create:
           if perteneceAEmpresa(empresaId)
           && empresaActiva(empresaId)
+          && tieneFinanciero(empresaId)
           && request.resource.data.valor is number
-          && request.resource.data.fecha is timestamp;
+          && request.resource.data.valor > 0
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.eliminado is bool
+          && request.resource.data.creadoPor is string;
 
+        // ✅ FIX: update de gastos también valida plan financiero
         allow update:
           if perteneceAEmpresa(empresaId)
-          && empresaActiva(empresaId);
+          && empresaActiva(empresaId)
+          && tieneFinanciero(empresaId);
 
         allow delete: if false;
       }
@@ -235,6 +265,40 @@ service cloud.firestore {
           && request.resource.data.count == resource.data.count + 1;
 
         allow delete: if false;
+      }
+
+      /* ============================
+         CIERRE MENSUAL — FIX #4
+         Bloquea asientos en meses cerrados
+      ============================ */
+
+      match /cierres/{mesId} {
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+        // Solo admin o superadmin pueden crear un cierre
+        allow create:
+          if (esAdmin(empresaId) || esSuperAdmin())
+          && empresaActiva(empresaId)
+          && request.resource.data.keys().hasAll(['cerradoEn','cerradoPor','mes'])
+          && request.resource.data.mes is string;
+
+        // Un cierre no se puede modificar ni eliminar
+        allow update, delete: if false;
+      }
+
+      /* ============================
+         SALDOS MAYOR — FIX #5
+         Solo Cloud Functions pueden escribir
+      ============================ */
+
+      match /saldosMayor/{mesId} {
+        allow read:
+          if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+        // Solo superadmin puede escribir (simula Cloud Function con cuenta de servicio)
+        allow write:
+          if esSuperAdmin();
       }
 
     }
@@ -273,6 +337,110 @@ service cloud.firestore {
         || (isAuth() && request.auth.uid == uid);
 
       allow write: if false;
+    }
+
+    /* ============================
+       LIBRO DIARIO (contabilidad)
+    ============================ */
+
+    match /empresas/{empresaId}/libroDiario/{asientoId} {
+      allow read:
+        if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+      // ✅ FIX #4: Bloquear asientos si el mes está cerrado
+      allow create:
+        if perteneceAEmpresa(empresaId)
+        && empresaActiva(empresaId)
+        && tieneContabilidad(empresaId)
+        && request.resource.data.cuadrado == true
+        && request.resource.data.lineas is list
+        && request.resource.data.lineas.size() >= 2
+        && request.resource.data.mes is string
+        && mesNoCerrado(empresaId, request.resource.data.mes);
+
+      // ✅ Asientos son inmutables (soft-delete solo con campo anulado)
+      allow update:
+        if (esSuperAdmin()
+          || esAdmin(empresaId))
+        && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['anulado','anuladoEn','anuladoPor','motivo']);
+
+      allow delete: if false;
+    }
+
+    /* ============================
+       LOGS DE EMPRESA (auditoría inmutable)
+    ============================ */
+
+    match /empresas/{empresaId}/logs/{logId} {
+      allow read:
+        if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+      allow create:
+        if perteneceAEmpresa(empresaId)
+        && request.resource.data.fecha is timestamp;
+
+      // ✅ Logs son inmutables
+      allow update, delete: if false;
+    }
+
+    /* ============================
+       INVITACIONES
+    ============================ */
+
+    match /empresas/{empresaId}/invitaciones/{invId} {
+      allow read:
+        if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+      allow create:
+        if esAdmin(empresaId)
+        && empresaActiva(empresaId)
+        && request.resource.data.token is string
+        && request.resource.data.expira is timestamp;
+
+      allow update:
+        if isAuth()
+        && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['usada','usadaEn']);
+
+      allow delete: if false;
+    }
+
+    /* ============================
+       ALERTAS CONTABLES
+    ============================ */
+
+    match /empresas/{empresaId}/alertasContables/{alertaId} {
+      allow read:
+        if perteneceAEmpresa(empresaId) || esSuperAdmin();
+
+      allow create:
+        if perteneceAEmpresa(empresaId)
+        && tieneContabilidad(empresaId);
+
+      allow update, delete: if false;
+    }
+
+    /* ============================
+       ERRORES GLOBALES (centralizados)
+    ============================ */
+
+    match /errores/{errorId} {
+      allow read: if esSuperAdmin();
+
+      allow create: if isAuth();
+
+      allow update, delete: if false;
+    }
+
+    /* ============================
+       MÉTRICAS SAAS (solo superadmin)
+    ============================ */
+
+    match /metricasSaas/{fecha} {
+      allow read, write: if esSuperAdmin();
     }
 
     /* ============================

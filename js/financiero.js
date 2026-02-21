@@ -59,6 +59,21 @@ export async function guardarGasto() {
     });
 
     await escribirLog("gasto_registrado", `Registró gasto: ${categoria} $${valor.toLocaleString("es-CO")}`, { valor, categoria });
+
+    // 🔴 CRÍTICO: Asiento contable automático al registrar gasto (solo superpremium)
+    try {
+      const { crearAsientoAutomatico } = await import('./contabilidad.js');
+      await crearAsientoAutomatico("gasto_registrado", {
+        categoria,
+        descripcion: desc || categoria,
+        valor,
+        ref: `GASTO-${new Date().toISOString().slice(0,10)}`,
+      });
+    } catch(e) {
+      // Plan sin contabilidad — continuar sin error
+      console.log("[financiero] Asiento no creado (plan sin contabilidad):", e.message);
+    }
+
     toast("Gasto registrado ✓", "success");
 
     // Limpiar formulario

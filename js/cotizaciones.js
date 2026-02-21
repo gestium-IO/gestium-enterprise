@@ -7,7 +7,7 @@ import { db } from './firebase.js';
 import {
   collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, limit, startAfter, where,
-  Timestamp, runTransaction
+  Timestamp, runTransaction, increment
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 import { $, clp, fmtM3, fmt, toast, checkRateLimit } from './utils.js';
 import { hasPermission, getLimits } from './features.js';
@@ -54,9 +54,17 @@ export async function guardarCliente() {
   const n = $("cliente").value.trim();
   if (!n) { toast("Escribe el nombre del cliente", "warn"); return; }
   const col = collection(db,"empresas",_empresaId,"clientes");
-  const snap = await getDocs(col); let existe = false;
-  snap.forEach(d => { if ((d.data().nombre||"").toLowerCase() === n.toLowerCase()) existe = true; });
-  if (existe) { toast("Ese cliente ya existe", "warn"); return; }
+const q = query(
+  col,
+  where("nombreNormalizado","==", n.toLowerCase()),
+  limit(1)
+);
+
+const snap = await getDocs(q);
+if (!snap.empty) {
+  toast("Ese cliente ya existe", "warn");
+  return;
+}  
   await addDoc(col, { nombre:n, nombreNormalizado:n.toLowerCase(), creadoEn:Timestamp.fromDate(new Date()) });
   await escribirLog("cliente_creado", `Creó cliente "${n}"`);
   await cargarClientes();
@@ -111,7 +119,8 @@ export async function generarCotizacion() {
     const cnt = (es.data().contador || 0) + 1;
     num = "COT-" + String(cnt).padStart(3, "0");
 
-    tx.update(empRef, { contador: cnt });
+    // 🔴 CRÍTICO: contador + cotCount en UN solo update (atomicidad)
+    tx.update(empRef, { contador: cnt, cotCount: increment(1) });
 
     const cotRef = doc(
       db,
